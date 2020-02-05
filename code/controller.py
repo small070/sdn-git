@@ -92,7 +92,8 @@ class good_controller(app_manager.RyuApp):
         for stat in ev.msg.body:
             arr.append(stat.port_no)
 
-        self.df.loc[self.live_port_index-1, 'live_port'] = arr
+        if self.df.loc[-1, 'live_port'] == -1:
+            self.df.loc[-1, 'live_port'] = arr
 
         # self.df.loc['live_port'] = arr
         print('=============================================')

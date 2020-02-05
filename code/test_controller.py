@@ -46,10 +46,13 @@ b = pd.Series(2)
 
 # df['switch_id'] = a
 # df['switch_id'] = b
-print('df: ', df)
+# print('df: ', df)
 c=[1,2,3]
-df=df.append({'live_port':c}, ignore_index=True)
+
 df=df.append({'switch_id':4, 'live_port':[1,5,3]}, ignore_index=True)
+df=df.append({'switch_id':5}, ignore_index=True)
+df.iloc[-1,-1] = 666
+# df.loc[2,'live_port'] = 888
 
 # df = df['switch_id'].append([2])
 # df = df['switch_id'].append([3])
