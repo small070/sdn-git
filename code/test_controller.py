@@ -19,7 +19,6 @@ df = pd.DataFrame([[1,2]],columns=['switch_id', 'live_port'])
 #         arr.append(stat)
 #         # if # end of arr
 
-
 # print('df = ', df)
 
 testarr = [429,1,2]

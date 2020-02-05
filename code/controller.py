@@ -12,7 +12,7 @@ import pandas as pd
 class good_controller(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
     sw_dpid = dict()
-    normal_port = dict()
+    live_port_index = 0
     df = pd.DataFrame(columns=['switch_id', 'live_port'])
 
     def __init__(self, *args, **kwargs):
@@ -78,6 +78,7 @@ class good_controller(app_manager.RyuApp):
         print('dpid: ', msg.datapath_id)
         # self.df.append(msg.datapath_id, ignore_index='live_port')
         self.df = self.df.append({'switch_id': msg.datapath_id, 'live_port': -1}, ignore_index=True)
+        self.live_port_index = self.live_port_index + 1
         print('df: ', self.df)
 
     @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
@@ -86,24 +87,17 @@ class good_controller(app_manager.RyuApp):
         datapath = ev.msg.datapath
         ofproto_parser = datapath.ofproto_parser
         arr = []
-        for stat in ev.msg.body:
+        live_port_index = 0
 
-            # print('type: ', type(stat.port_no), stat.port_no)
-            # if stat.port_no >= 50 and len(arr):
-            #     arr.append(stat.port_no)
-            # elif stat.port_no <= 48:
-            #     arr.append(stat.port_no)
-            # elif stat.port_no >= 50 and not len(arr):
-            #     self.normal_port.setdefault('live port', [])
-            #     self.normal_port['live port'].append(arr)
-            #     arr.clear()
+        for stat in ev.msg.body:
             arr.append(stat.port_no)
-        self.df.loc[len(self.df)-1, 'live_port'] = arr
+
+        self.df.loc[self.live_port_index-1, 'live_port'] = arr
+
         # self.df.loc['live_port'] = arr
         print('=============================================')
         print('|         port_stats_reply_handler          |')
         print('=============================================')
-        print("normal_port_no: ", self.normal_port)
         print("arr: ", arr)
         print("df: ", self.df)
         print('...')
