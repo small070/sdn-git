@@ -77,7 +77,7 @@ class good_controller(app_manager.RyuApp):
         msg.datapath.send_msg(req)
         print('dpid: ', msg.datapath_id)
         # self.df.append(msg.datapath_id, ignore_index='live_port')
-        self.df = self.df.append({'switch_id': msg.datapath_id, 'live_port': 'None'}, ignore_index=True)
+        self.df = self.df.append({'switch_id': msg.datapath_id, 'live_port': -1}, ignore_index=True)
         print('df: ', self.df)
 
     @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
@@ -98,8 +98,8 @@ class good_controller(app_manager.RyuApp):
             #     self.normal_port['live port'].append(arr)
             #     arr.clear()
             arr.append(stat.port_no)
-        # self.df.replace({'live_port': {0: arr}}, inplace=True)
         self.df.loc[len(self.df)-1, 'live_port'] = arr
+        # self.df.loc['live_port'] = arr
         print('=============================================')
         print('|         port_stats_reply_handler          |')
         print('=============================================')
