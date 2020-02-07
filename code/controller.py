@@ -6,8 +6,6 @@ from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.ofproto import ofproto_v1_3_parser
-import time
-from operator import attrgetter
 import pandas as pd
 
 class good_controller(app_manager.RyuApp):
@@ -21,6 +19,7 @@ class good_controller(app_manager.RyuApp):
 
     @set_ev_cls(event.EventSwitchEnter)
     def get_switch(self, ev):
+
         # self.topo_raw_switches = get_switch(self, None)
         # self.topo_raw_links = get_link(self, None)
         # self.topo_raw_hosts = get_host(self, None)
@@ -48,81 +47,77 @@ class good_controller(app_manager.RyuApp):
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
-        # method 1 of send port_no
         datapath = ev.msg.datapath
         ofproto = datapath.ofproto
         # parser = datapath.ofproto_parser
-        #
-        self.sw_dpid.setdefault('switch dpid', [])
-        self.sw_dpid['switch dpid'].append(ev.msg.datapath_id)
-        # req = parser.OFPPortStatsRequest(datapath, 0, ofproto.OFPP_ANY)
-        # datapath.send_msg(req)
+        msg = ev.msg
+
+        self.send_port_stats_request(msg)
         print('=============================================')
         print('|          switch_features_handler          |')
         print('=============================================')
-        # print("sw_dpid: ", self.sw_dpid)
         print('...')
         print('..')
         print('.')
 
-    # method 2 of send port_no
-        msg = ev.msg
-    #     datapath = msg.datapath
-
-        self.send_port_stats_request(msg)
     def send_port_stats_request(self, msg):
         ofp = msg.datapath.ofproto
         ofp_parser = msg.datapath.ofproto_parser
 
         req = ofp_parser.OFPPortStatsRequest(msg.datapath, 0, ofp.OFPP_ANY)
         msg.datapath.send_msg(req)
-        print('dpid: ', msg.datapath_id)
-        # self.df.append(msg.datapath_id, ignore_index='live_port')
+
+        # Append msg.datapath_id to df's 'switch_id' columns
         self.df = self.df.append({'switch_id': msg.datapath_id}, ignore_index=True)
-        self.df['switch_id'] = self.df['switch_id'].astype('int')
-        print('df: ', self.df)
 
     @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
     def port_stats_reply_handler(self, ev):
         msg = ev.msg
         datapath = ev.msg.datapath
         ofproto_parser = datapath.ofproto_parser
-        arr = []
 
+        # Append stat.port_no to df's 'live_port' columns
         for stat in ev.msg.body:
-            arr.append(stat.port_no)
 
-        body = ev.msg.body
+            # Append port(e.g. 4294967294) between switch and controller
+            if stat.port_no>=50:
+                self.df.at[len(self.df) - 1, 'live_port'] = stat.port_no
 
-        self.logger.info('datapath         port     '
-                         'rx-pkts  rx-bytes rx-error '
-                         'tx-pkts  tx-bytes tx-error')
-        self.logger.info('---------------- -------- '
-                         '-------- -------- -------- '
-                         '-------- -------- --------')
-        for stat in sorted(body, key=attrgetter('port_no')):
-            self.logger.info('%016x %8x %8d %8d %8d %8d %8d %8d',
-                             ev.msg.datapath.id, stat.port_no,
-                             stat.rx_packets, stat.rx_bytes, stat.rx_errors,
-                             stat.tx_packets, stat.tx_bytes, stat.tx_errors)
+            # Append ports(e.g. 1,2,3...) between switch and switch or host
+            # Mate switch_id and ports to df
+            else:
+                self.df = self.df.append({'live_port': stat.port_no}, ignore_index=True)
+                self.df.at[len(self.df)-1, 'switch_id'] = self.df.at[len(self.df)-2, 'switch_id']
 
+        self.df['switch_id'] = self.df['switch_id'].astype('int')
+        self.df['live_port'] = self.df['live_port'].astype('int')
 
-        # # if self.df.isnull().loc[self.live_port_index, 'live_port']:
-        # #     # self.df._set_value(self.live_port_index, 'live_port', arr)
-        # #     self.df.loc[self.live_port_index, 'live_port'] = arr
-        # self.df._set_value(self.live_port_index, 'live_port', arr)
-        # # else:
-        # #     # self.df._set_value(self.live_port_index + 1, 'live_port', arr)
-        # #     self.df.loc[self.live_port_index + 1, 'live_port'] = arr
-        # self.live_port_index = self.live_port_index + 1
-        print(arr, type(arr))
-        # print(self.df.loc[0, 'live_port'])
-        # self.df.loc[len(self.df)-1, 'live_port'] = arr
         print('=============================================')
         print('|         port_stats_reply_handler          |')
         print('=============================================')
-        print("arr: ", arr)
-        print("df: ", self.df)
+        # print('df長度', len(self.df))
+        # print('df內容', self.df)
         print('...')
         print('..')
         print('.')
+
+        # -------------------------------------------------------------
+        # Log Mode
+
+        # from operator import attrgetter
+        # body = ev.msg.body
+        #
+        # self.logger.info('datapath         port     '
+        #                  'rx-pkts  rx-bytes rx-error '
+        #                  'tx-pkts  tx-bytes tx-error')
+        # self.logger.info('---------------- -------- '
+        #                  '-------- -------- -------- '
+        #                  '-------- -------- --------')
+        # for stat2 in sorted(body, key=attrgetter('port_no')):
+        #     self.logger.info('%016x %8x %8d %8d %8d %8d %8d %8d',
+        #                      ev.msg.datapath.id, stat2.port_no,
+        #                      stat2.rx_packets, stat2.rx_bytes, stat2.rx_errors,
+        #                      stat2.tx_packets, stat2.tx_bytes, stat2.tx_errors)
+        # -------------------------------------------------------------
+
+
