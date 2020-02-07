@@ -7,6 +7,7 @@ from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.ofproto import ofproto_v1_3_parser
 import time
+from operator import attrgetter
 import pandas as pd
 
 class good_controller(app_manager.RyuApp):
@@ -59,7 +60,7 @@ class good_controller(app_manager.RyuApp):
         print('=============================================')
         print('|          switch_features_handler          |')
         print('=============================================')
-        print("sw_dpid: ", self.sw_dpid)
+        # print("sw_dpid: ", self.sw_dpid)
         print('...')
         print('..')
         print('.')
@@ -78,6 +79,7 @@ class good_controller(app_manager.RyuApp):
         print('dpid: ', msg.datapath_id)
         # self.df.append(msg.datapath_id, ignore_index='live_port')
         self.df = self.df.append({'switch_id': msg.datapath_id}, ignore_index=True)
+        self.df['switch_id'] = self.df['switch_id'].astype('int')
         print('df: ', self.df)
 
     @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
@@ -90,14 +92,32 @@ class good_controller(app_manager.RyuApp):
         for stat in ev.msg.body:
             arr.append(stat.port_no)
 
-        if self.df.isnull().loc[self.live_port_index, 'live_port']:
-            # self.df._set_value(self.live_port_index, 'live_port', arr)
-            self.df.loc[self.live_port_index, 'live_port'] = arr
-        else:
-            # self.df._set_value(self.live_port_index + 1, 'live_port', arr)
-            self.df.loc[self.live_port_index + 1, 'live_port'] = arr
-        self.live_port_index = self.live_port_index + 1
-        # self.df.loc['live_port'] = arr
+        body = ev.msg.body
+
+        self.logger.info('datapath         port     '
+                         'rx-pkts  rx-bytes rx-error '
+                         'tx-pkts  tx-bytes tx-error')
+        self.logger.info('---------------- -------- '
+                         '-------- -------- -------- '
+                         '-------- -------- --------')
+        for stat in sorted(body, key=attrgetter('port_no')):
+            self.logger.info('%016x %8x %8d %8d %8d %8d %8d %8d',
+                             ev.msg.datapath.id, stat.port_no,
+                             stat.rx_packets, stat.rx_bytes, stat.rx_errors,
+                             stat.tx_packets, stat.tx_bytes, stat.tx_errors)
+
+
+        # # if self.df.isnull().loc[self.live_port_index, 'live_port']:
+        # #     # self.df._set_value(self.live_port_index, 'live_port', arr)
+        # #     self.df.loc[self.live_port_index, 'live_port'] = arr
+        # self.df._set_value(self.live_port_index, 'live_port', arr)
+        # # else:
+        # #     # self.df._set_value(self.live_port_index + 1, 'live_port', arr)
+        # #     self.df.loc[self.live_port_index + 1, 'live_port'] = arr
+        # self.live_port_index = self.live_port_index + 1
+        print(arr, type(arr))
+        # print(self.df.loc[0, 'live_port'])
+        # self.df.loc[len(self.df)-1, 'live_port'] = arr
         print('=============================================')
         print('|         port_stats_reply_handler          |')
         print('=============================================')
