@@ -3,23 +3,7 @@ import pandas as pd
 arr = []
 ev_msg_body = [429,1,2,429,1,2,3,429,1,2]
 df = pd.DataFrame([[1,2]],columns=['switch_id', 'live_port'])
-# print(len(arr))
-# i = 0
-# for stat in ev_msg_body:
-#     if stat >= 50 and len(arr) > 0:
-#         print('arr = ', arr)
-#         # func = lambda i=0: i + 1
-#         df.loc[i, 'live port'] = arr
-#         arr.clear()
-#         arr.append(stat)
-#         i = i + 1
-#     elif stat >= 50:
-#         arr.append(stat)
-#     elif stat <= 50:
-#         arr.append(stat)
-#         # if # end of arr
 
-# print('df = ', df)
 
 testarr = [429,1,2]
 testarr2 = [429,1,2,3]
@@ -51,8 +35,13 @@ c=[1,2,3]
 
 df=df.append({'switch_id':4, 'live_port':[1,5,3]}, ignore_index=True)
 df=df.append({'switch_id':5}, ignore_index=True)
-df.iloc[-1,-1] = 666
-# df.loc[2,'live_port'] = 888
+# df.iloc[-1,-1] = 666
+# df.ix[:, 'live_port'] = 456
+print(df.loc[2,'live_port'])
+if df.isnull().loc[2, 'live_port']:
+    print('isnull: ', df.isnull().loc[2, 'live_port'])
+    # df.loc[2,'live_port'] = [frozenset(c)] # frozenset()存不可變序列
+    df._set_value(2,'live_port', c) # 存可變序列
 
 # df = df['switch_id'].append([2])
 # df = df['switch_id'].append([3])

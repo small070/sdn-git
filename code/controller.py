@@ -77,8 +77,7 @@ class good_controller(app_manager.RyuApp):
         msg.datapath.send_msg(req)
         print('dpid: ', msg.datapath_id)
         # self.df.append(msg.datapath_id, ignore_index='live_port')
-        self.df = self.df.append({'switch_id': msg.datapath_id, 'live_port': -1}, ignore_index=True)
-        self.live_port_index = self.live_port_index + 1
+        self.df = self.df.append({'switch_id': msg.datapath_id}, ignore_index=True)
         print('df: ', self.df)
 
     @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
@@ -87,14 +86,17 @@ class good_controller(app_manager.RyuApp):
         datapath = ev.msg.datapath
         ofproto_parser = datapath.ofproto_parser
         arr = []
-        live_port_index = 0
 
         for stat in ev.msg.body:
             arr.append(stat.port_no)
 
-        if self.df.loc[-1, 'live_port'] == -1:
-            self.df.loc[-1, 'live_port'] = arr
-
+        if self.df.isnull().loc[self.live_port_index, 'live_port']:
+            # self.df._set_value(self.live_port_index, 'live_port', arr)
+            self.df.loc[self.live_port_index, 'live_port'] = arr
+        else:
+            # self.df._set_value(self.live_port_index + 1, 'live_port', arr)
+            self.df.loc[self.live_port_index + 1, 'live_port'] = arr
+        self.live_port_index = self.live_port_index + 1
         # self.df.loc['live_port'] = arr
         print('=============================================')
         print('|         port_stats_reply_handler          |')
