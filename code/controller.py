@@ -93,6 +93,7 @@ class good_controller(app_manager.RyuApp):
             else:
                 self.df.at[len(self.df) - 1, 'live_port'] = stat.port_no
 
+        # if Nan will error
         # self.df['switch_id'] = self.df['switch_id'].astype('int')
         # self.df['live_port'] = self.df['live_port'].astype('int')
 
