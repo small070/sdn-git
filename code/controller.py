@@ -87,14 +87,14 @@ class good_controller(app_manager.RyuApp):
             # Mate switch_id and ports to df
             if stat.port_no < ofproto_v1_3_parser.ofproto.OFPP_MAX:
                 self.df = self.df.append({'live_port': stat.port_no}, ignore_index=True)
-                self.df.at[len(self.df) - 1, 'switch_id'] = self.df.at[len(self.df) - 2, 'switch_id']
+                # self.df.at[len(self.df) - 1, 'switch_id'] = self.df.at[len(self.df) - 2, 'switch_id']
 
             # Append port(e.g. 4294967294) between switch and controller
             else:
                 self.df.at[len(self.df) - 1, 'live_port'] = stat.port_no
 
-        self.df['switch_id'] = self.df['switch_id'].astype('int')
-        self.df['live_port'] = self.df['live_port'].astype('int')
+        # self.df['switch_id'] = self.df['switch_id'].astype('int')
+        # self.df['live_port'] = self.df['live_port'].astype('int')
 
         print('=============================================')
         print('|         port_stats_reply_handler          |')
