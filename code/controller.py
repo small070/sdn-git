@@ -64,30 +64,34 @@ class good_controller(app_manager.RyuApp):
         ofp = msg.datapath.ofproto
         ofp_parser = msg.datapath.ofproto_parser
 
-        req = ofp_parser.OFPPortStatsRequest(msg.datapath, 0, ofp.OFPP_ANY)
+        # req = ofp_parser.OFPPortStatsRequest(msg.datapath, 0, ofp.OFPP_ANY)
+        req = ofp_parser.OFPPortDescStatsRequest(msg.datapath, 0, ofp.OFPP_ANY)
         msg.datapath.send_msg(req)
 
         # Append msg.datapath_id to df's 'switch_id' columns
         self.df = self.df.append({'switch_id': msg.datapath_id}, ignore_index=True)
 
-    @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
+    @set_ev_cls(ofp_event.EventOFPPortDescStatsReply, MAIN_DISPATCHER)
     def port_stats_reply_handler(self, ev):
         msg = ev.msg
         datapath = ev.msg.datapath
+        ofproto = datapath.ofproto
         ofproto_parser = datapath.ofproto_parser
+        tmp = []
 
         # Append stat.port_no to df's 'live_port' columns
         for stat in ev.msg.body:
-
-            # Append port(e.g. 4294967294) between switch and controller
-            if stat.port_no>=50:
-                self.df.at[len(self.df) - 1, 'live_port'] = stat.port_no
+            tmp.append(stat.hw_addr)
 
             # Append ports(e.g. 1,2,3...) between switch and switch or host
             # Mate switch_id and ports to df
-            else:
+            if stat.port_no < ofproto_v1_3_parser.ofproto.OFPP_MAX:
                 self.df = self.df.append({'live_port': stat.port_no}, ignore_index=True)
-                self.df.at[len(self.df)-1, 'switch_id'] = self.df.at[len(self.df)-2, 'switch_id']
+                self.df.at[len(self.df) - 1, 'switch_id'] = self.df.at[len(self.df) - 2, 'switch_id']
+
+            # Append port(e.g. 4294967294) between switch and controller
+            else:
+                self.df.at[len(self.df) - 1, 'live_port'] = stat.port_no
 
         self.df['switch_id'] = self.df['switch_id'].astype('int')
         self.df['live_port'] = self.df['live_port'].astype('int')
@@ -96,7 +100,8 @@ class good_controller(app_manager.RyuApp):
         print('|         port_stats_reply_handler          |')
         print('=============================================')
         # print('df長度', len(self.df))
-        # print('df內容', self.df)
+        print('tmp內容', tmp)
+        print('df內容', self.df)
         print('...')
         print('..')
         print('.')
