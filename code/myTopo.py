@@ -93,7 +93,7 @@ def creater():
     test.create_switch()
     test.create_link()
     net = Mininet(topo = test, link = TCLink, controller = None)
-    net.addController('controller1', controller = RemoteController, ip = '127.0.0.1', port = 6633)
+    net.addController('controller1', controller = RemoteController, ip = '127.0.0.1', port = 6653)
     net.start()
     CLI(net)
 

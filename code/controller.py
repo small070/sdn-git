@@ -12,7 +12,7 @@ class good_controller(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
     sw_dpid = dict()
     live_port_index = 0
-    df = pd.DataFrame(columns=['switch_id', 'live_port'])
+    df = pd.DataFrame(columns=['switch_id', 'live_port', 'hw_addr'])
 
     def __init__(self, *args, **kwargs):
         super(good_controller, self).__init__(*args, **kwargs)
@@ -86,14 +86,18 @@ class good_controller(app_manager.RyuApp):
             # Append ports(e.g. 1,2,3...) between switch and switch or host
             # Mate switch_id and ports to df
             if stat.port_no < ofproto_v1_3_parser.ofproto.OFPP_MAX:
-                self.df = self.df.append({'live_port': stat.port_no}, ignore_index=True)
-                # self.df.at[len(self.df) - 1, 'switch_id'] = self.df.at[len(self.df) - 2, 'switch_id']
+                self.df = self.df.append({'live_port': stat.port_no, 'hw_addr': stat.hw_addr}, ignore_index=True)
 
             # Append port(e.g. 4294967294) between switch and controller
             else:
-                self.df.at[len(self.df) - 1, 'live_port'] = stat.port_no
 
-        # if Nan will error
+                # 'at' just use int or float
+                # 'loc' can use int or float or string ......
+                # But 'at' faster to 'loc'
+                self.df.at[len(self.df), 'live_port'] = stat.port_no
+                self.df.loc[len(self.df), 'hw_addr'] = stat.hw_addr
+
+        # if value == Nan will error
         # self.df['switch_id'] = self.df['switch_id'].astype('int')
         # self.df['live_port'] = self.df['live_port'].astype('int')
 
@@ -126,4 +130,24 @@ class good_controller(app_manager.RyuApp):
         #                      stat2.tx_packets, stat2.tx_bytes, stat2.tx_errors)
         # -------------------------------------------------------------
 
+    @set_ev_cls(ofp_event.EventOFPPortStatus, MAIN_DISPATCHER)
+    def port_status_handler(self, ev):
+        msg = ev.msg
+        datapath = msg.datapath
+        ofp = datapath.ofproto
 
+        if msg.reason == ofp.OFPPR_ADD:
+            print('Add')
+            # reason = 'ADD'
+        elif msg.reason == ofp.OFPPR_DELETE:
+            print('Delete')
+            # reason = 'DELETE'
+        elif msg.reason == ofp.OFPPR_MODIFY:
+            print('Modify')
+            # reason = 'MODIFY'
+        else:
+            print('Unknown')
+            # reason = 'unknown'
+
+        # self.logger.debug('OFPPortStatus received: reason=%s desc=%s',
+        #                   reason, msg.desc)
