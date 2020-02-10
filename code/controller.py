@@ -17,6 +17,32 @@ class good_controller(app_manager.RyuApp):
     def __init__(self, *args, **kwargs):
         super(good_controller, self).__init__(*args, **kwargs)
 
+    # 處理輸出完資料的dataframe
+    def sort_out_dataframe(self):
+
+        # 先填充siwtch_id的部份
+        # ffill = 向後填充資料          bfill = 向後填充資料
+        self.df['switch_id'] = self.df['switch_id'].fillna(method='ffill')
+
+        # 放每台switch連到controller port的資料
+        ct_si_lp_df = self.df[self.df['hw_addr'].isnull() & self.df['live_port'].notnull()]
+
+        # 放每台switch連到controller hw_addr的資料
+        ct_si_hw_df = self.df[self.df['hw_addr'].notnull() & self.df['live_port'].isnull()]
+
+        # 換成相同index以供之後合併到self.df使用
+        ct_si_lp_df.set_index(ct_si_hw_df.index, inplace=True)
+
+        # 用ct_si_lp_df的資料補齊ct_si_hw_df
+        ct_si_hw_df = ct_si_hw_df.combine_first(ct_si_lp_df)
+
+        # 用ct_si_hw_df的資料補齊self.df
+        self.df = self.df.combine_first(ct_si_hw_df)
+
+        # 刪除多餘的資料並重新調整索引
+        self.df = self.df.dropna(axis=0).reset_index().drop(columns='index')
+
+
     @set_ev_cls(event.EventSwitchEnter)
     def get_switch(self, ev):
 
@@ -97,16 +123,17 @@ class good_controller(app_manager.RyuApp):
                 self.df.at[len(self.df), 'live_port'] = stat.port_no
                 self.df.loc[len(self.df), 'hw_addr'] = stat.hw_addr
 
+        self.sort_out_dataframe()
+
         # if value == Nan will error
         # self.df['switch_id'] = self.df['switch_id'].astype('int')
         # self.df['live_port'] = self.df['live_port'].astype('int')
-
         print('=============================================')
         print('|         port_stats_reply_handler          |')
         print('=============================================')
         # print('df長度', len(self.df))
-        print('tmp內容', tmp)
-        print('df內容', self.df)
+        # print('tmp內容', tmp)
+        print('fillna後內容', self.df)
         print('...')
         print('..')
         print('.')
@@ -129,6 +156,8 @@ class good_controller(app_manager.RyuApp):
         #                      stat2.rx_packets, stat2.rx_bytes, stat2.rx_errors,
         #                      stat2.tx_packets, stat2.tx_bytes, stat2.tx_errors)
         # -------------------------------------------------------------
+
+
 
     @set_ev_cls(ofp_event.EventOFPPortStatus, MAIN_DISPATCHER)
     def port_status_handler(self, ev):

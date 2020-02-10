@@ -11,11 +11,17 @@ c=[1,2,3]
 d=[4,5,6]
 i= 1
 
-df=df.append({'switch_id':1}, ignore_index=True)
-df=df.append({'live_port':4294967}, ignore_index=True)
-df=df.append({'hw_addr':'2e:f2:9f:aa:62:4d:'}, ignore_index=True)
-df=df.append({'live_port':1, 'hw_addr':'e2:64:98:d2:8b:d7'}, ignore_index=True)
-df=df.append({'live_port':2, 'hw_addr':'d2:03:07:ee:ad:a4:'}, ignore_index=True)
+# df=df.append({'switch_id':1}, ignore_index=True)
+# df=df.append({'live_port':4294967}, ignore_index=True)
+# df=df.append({'hw_addr':'2e:f2:9f:aa:62:4d:'}, ignore_index=True)
+# df=df.append({'live_port':1, 'hw_addr':'e2:64:98:d2:8b:d7'}, ignore_index=True)
+# df=df.append({'live_port':2, 'hw_addr':'d2:03:07:ee:ad:a4:'}, ignore_index=True)
+# df=df.append({'switch_id':3}, ignore_index=True)
+
+df=df.append({'switch_id':1, 'live_port':4294967, 'hw_addr':'2e:f2:9f:aa:62:4d:'}, ignore_index=True)
+df=df.append({'switch_id':1, 'live_port':1, 'hw_addr':'e2:64:98:d2:8b:d7'}, ignore_index=True)
+df=df.append({'switch_id':1, 'live_port':2, 'hw_addr':'d2:03:07:ee:ad:a4:'}, ignore_index=True)
+
 df=df.append({'switch_id':3}, ignore_index=True)
 df=df.append({'live_port':4294967}, ignore_index=True)
 df=df.append({'hw_addr':'de:7e:b4:a7:f0:42'}, ignore_index=True)
@@ -23,15 +29,37 @@ df=df.append({'live_port':4, 'hw_addr':'12:fb:02:12:67:77'}, ignore_index=True)
 df=df.append({'live_port':1, 'hw_addr':'26:50:fb:81:1f:df'}, ignore_index=True)
 df=df.append({'live_port':2, 'hw_addr':'56:7c:81:82:c1:07'}, ignore_index=True)
 df=df.append({'live_port':3, 'hw_addr':'6a:ec:db:25:c0:f1'}, ignore_index=True)
-df=df.append({'switch_id':2}, ignore_index=True)
-df=df.append({'live_port':4294967}, ignore_index=True)
-df=df.append({'hw_addr':'7a:5f:99:46:04:4d'}, ignore_index=True)
-df=df.append({'live_port':1, 'hw_addr':'ee:fe:46:c4:29:01'}, ignore_index=True)
-df=df.append({'live_port':4, 'hw_addr':'8a:6d:2f:7e:a1:ac'}, ignore_index=True)
-df=df.append({'live_port':2, 'hw_addr':'9a:4c:7e:21:31:38'}, ignore_index=True)
-df=df.append({'live_port':3, 'hw_addr':'ae:1a:9b:8f:72:99'}, ignore_index=True)
 
+# df=df.append({'switch_id':2}, ignore_index=True)
+# df=df.append({'live_port':4294967}, ignore_index=True)
+# df=df.append({'hw_addr':'7a:5f:99:46:04:4d'}, ignore_index=True)
+# df=df.append({'live_port':1, 'hw_addr':'ee:fe:46:c4:29:01'}, ignore_index=True)
+# df=df.append({'live_port':4, 'hw_addr':'8a:6d:2f:7e:a1:ac'}, ignore_index=True)
+# df=df.append({'live_port':2, 'hw_addr':'9a:4c:7e:21:31:38'}, ignore_index=True)
+# df=df.append({'live_port':3, 'hw_addr':'ae:1a:9b:8f:72:99'}, ignore_index=True)
+
+# print(df)
+# print(df.isnull().any(axis = 0))
+df['switch_id'] = df['switch_id'].fillna(method='ffill')
+
+# print(df[df['hw_addr'].isnull() & df['live_port'].notnull()])
+df1 = df[df['hw_addr'].isnull() & df['live_port'].notnull()]
+# print(df[df['hw_addr'].notnull() & df['live_port'].isnull()])
+df2 = df[df['hw_addr'].notnull() & df['live_port'].isnull()]
+
+df1.set_index(df2.index, inplace=True)
+# print(df1)
+# print(df1.index)
+# print(df2)
+# print(df2.index)
+
+df2 = df2.combine_first(df1)
+# print(df2.combine_first(df1))
+df = df.combine_first(df2)
+# print(df)
+df = df.dropna(axis=0).reset_index().drop(columns='index')
 print(df)
+
 
 # df=df.append({'switch_id':4, 'live_port':8}, ignore_index=True)
 # df=df.append({'switch_id':5}, ignore_index=True)
