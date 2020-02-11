@@ -6,6 +6,10 @@ from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.ofproto import ofproto_v1_3_parser
+from ryu.lib.packet import ethernet
+from ryu.lib.packet import ether_types
+from ryu.lib.packet import lldp
+from ryu.lib.packet import packet
 import pandas as pd
 
 class good_controller(app_manager.RyuApp):
@@ -16,32 +20,6 @@ class good_controller(app_manager.RyuApp):
 
     def __init__(self, *args, **kwargs):
         super(good_controller, self).__init__(*args, **kwargs)
-
-    # 處理輸出完資料的dataframe
-    def sort_out_dataframe(self):
-
-        # 先填充siwtch_id的部份
-        # ffill = 向後填充資料          bfill = 向後填充資料
-        self.df['switch_id'] = self.df['switch_id'].fillna(method='ffill')
-
-        # 放每台switch連到controller port的資料
-        ct_si_lp_df = self.df[self.df['hw_addr'].isnull() & self.df['live_port'].notnull()]
-
-        # 放每台switch連到controller hw_addr的資料
-        ct_si_hw_df = self.df[self.df['hw_addr'].notnull() & self.df['live_port'].isnull()]
-
-        # 換成相同index以供之後合併到self.df使用
-        ct_si_lp_df.set_index(ct_si_hw_df.index, inplace=True)
-
-        # 用ct_si_lp_df的資料補齊ct_si_hw_df
-        ct_si_hw_df = ct_si_hw_df.combine_first(ct_si_lp_df)
-
-        # 用ct_si_hw_df的資料補齊self.df
-        self.df = self.df.combine_first(ct_si_hw_df)
-
-        # 刪除多餘的資料並重新調整索引
-        self.df = self.df.dropna(axis=0).reset_index().drop(columns='index')
-
 
     @set_ev_cls(event.EventSwitchEnter)
     def get_switch(self, ev):
@@ -90,29 +68,30 @@ class good_controller(app_manager.RyuApp):
         ofp = msg.datapath.ofproto
         ofp_parser = msg.datapath.ofproto_parser
 
-        # req = ofp_parser.OFPPortStatsRequest(msg.datapath, 0, ofp.OFPP_ANY)
         req = ofp_parser.OFPPortDescStatsRequest(msg.datapath, 0, ofp.OFPP_ANY)
         msg.datapath.send_msg(req)
-
-        # Append msg.datapath_id to df's 'switch_id' columns
-        self.df = self.df.append({'switch_id': msg.datapath_id}, ignore_index=True)
 
     @set_ev_cls(ofp_event.EventOFPPortDescStatsReply, MAIN_DISPATCHER)
     def port_stats_reply_handler(self, ev):
         msg = ev.msg
         datapath = ev.msg.datapath
         ofproto = datapath.ofproto
-        ofproto_parser = datapath.ofproto_parser
+        parser = datapath.ofproto_parser
         tmp = []
+
+        # LLDP packet to controller
+        match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_LLDP)
+        actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
+        self.add_flow(datapath, 0, match, actions)
 
         # Append stat.port_no to df's 'live_port' columns
         for stat in ev.msg.body:
             tmp.append(stat.hw_addr)
 
             # Append ports(e.g. 1,2,3...) between switch and switch or host
-            # Mate switch_id and ports to df
             if stat.port_no < ofproto_v1_3_parser.ofproto.OFPP_MAX:
-                self.df = self.df.append({'live_port': stat.port_no, 'hw_addr': stat.hw_addr}, ignore_index=True)
+                self.df = self.df.append({'switch_id':datapath.id, 'live_port': stat.port_no, 'hw_addr': stat.hw_addr}, ignore_index=True)
+                self.send_lldp_packet(datapath, stat.port_no, stat.hw_addr)
 
             # Append port(e.g. 4294967294) between switch and controller
             else:
@@ -120,20 +99,15 @@ class good_controller(app_manager.RyuApp):
                 # 'at' just use int or float
                 # 'loc' can use int or float or string ......
                 # But 'at' faster to 'loc'
-                self.df.at[len(self.df), 'live_port'] = stat.port_no
-                self.df.loc[len(self.df), 'hw_addr'] = stat.hw_addr
+                self.df = self.df.append({'switch_id': datapath.id, 'live_port': stat.port_no, 'hw_addr': stat.hw_addr},
+                                         ignore_index=True)
 
-        self.sort_out_dataframe()
-
-        # if value == Nan will error
-        # self.df['switch_id'] = self.df['switch_id'].astype('int')
-        # self.df['live_port'] = self.df['live_port'].astype('int')
         print('=============================================')
         print('|         port_stats_reply_handler          |')
         print('=============================================')
         # print('df長度', len(self.df))
         # print('tmp內容', tmp)
-        print('fillna後內容', self.df)
+        print('df內容', self.df)
         print('...')
         print('..')
         print('.')
@@ -157,6 +131,40 @@ class good_controller(app_manager.RyuApp):
         #                      stat2.tx_packets, stat2.tx_bytes, stat2.tx_errors)
         # -------------------------------------------------------------
 
+    def add_flow(self, datapath, priority, match, actions):
+        ofp = datapath.ofproto
+        parser = datapath.ofproto_parser
+
+        inst = [parser.OFPInstructionActions(ofp.OFPIT_APPLY_ACTIONS, actions)]
+
+        mod = parser.OFPFlowMod(datapath=datapath, priority=priority, command=ofp.OFPFC_ADD,
+                               match=match, instructions=inst)
+        datapath.send_msg(mod)
+
+    def send_lldp_packet(self, datapath, live_port, hw_addr):
+        ofp = datapath.ofproto
+
+        # 產生一個packet然後加上ethernet type為lldp
+        pkt = packet.Packet()
+        pkt.add_protocol(ethernet.ethernet(ethertype=ether_types.ETH_TYPE_LLDP,
+                                           src=hw_addr, dst=lldp.LLDP_MAC_NEAREST_BRIDGE))
+        tlv_chassis_id = lldp.ChassisID(subtype=lldp.ChassisID.SUB_LOCALLY_ASSIGNED, chassis_id=str(datapath.id))
+        tlv_live_port = lldp.PortID(subtype=lldp.PortID.SUB_LOCALLY_ASSIGNED, port_id=str(live_port))
+        tlv_ttl = lldp.TTL(ttl=0)
+        tlv_end = lldp.End()
+        tlvs = (tlv_chassis_id, tlv_live_port, tlv_ttl, tlv_end)
+        pkt.add_protocol(lldp.lldp(tlvs))
+        pkt.serialize()
+
+        self.logger.info('packet_out %s', pkt)
+
+        # 製作完成後發送
+        # data = pkt.data
+        # parser = datapath.ofproto_parser
+        # actions = [parser.OFPActionOutput(port=live_port)]
+        # out = parser.OFPPacketOut(datapath=datapath, buffer_id=ofp.OFP_NO_BUFFER, in_port=ofp.OFPP_CONTROLLER,
+        #                           actions=actions, data=data)
+        # datapath.send_msg(out)
 
 
     @set_ev_cls(ofp_event.EventOFPPortStatus, MAIN_DISPATCHER)
