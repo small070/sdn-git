@@ -14,8 +14,7 @@ import pandas as pd
 
 class good_controller(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
-    sw_dpid = dict()
-    live_port_index = 0
+    lldp_topo = {}
     df = pd.DataFrame(columns=['switch_id', 'live_port', 'hw_addr'])
 
     def __init__(self, *args, **kwargs):
@@ -105,9 +104,9 @@ class good_controller(app_manager.RyuApp):
         print('=============================================')
         print('|         port_stats_reply_handler          |')
         print('=============================================')
-        # print('df長度', len(self.df))
-        # print('tmp內容', tmp)
-        print('df內容', self.df)
+        # print('df??', len(self.df))
+        # print('tmp??', tmp)
+        # print('df??', self.df)
         print('...')
         print('..')
         print('.')
@@ -144,27 +143,61 @@ class good_controller(app_manager.RyuApp):
     def send_lldp_packet(self, datapath, live_port, hw_addr):
         ofp = datapath.ofproto
 
-        # 產生一個packet然後加上ethernet type為lldp
+        # ????packet????ethernet type?lldp
         pkt = packet.Packet()
         pkt.add_protocol(ethernet.ethernet(ethertype=ether_types.ETH_TYPE_LLDP,
                                            src=hw_addr, dst=lldp.LLDP_MAC_NEAREST_BRIDGE))
-        tlv_chassis_id = lldp.ChassisID(subtype=lldp.ChassisID.SUB_LOCALLY_ASSIGNED, chassis_id=str(datapath.id))
-        tlv_live_port = lldp.PortID(subtype=lldp.PortID.SUB_LOCALLY_ASSIGNED, port_id=str(live_port))
+
+        # ????????????????str????ascii
+        tlv_chassis_id = lldp.ChassisID(subtype=lldp.ChassisID.SUB_LOCALLY_ASSIGNED, chassis_id=str(datapath.id).encode('ascii'))
+        tlv_live_port = lldp.PortID(subtype=lldp.PortID.SUB_LOCALLY_ASSIGNED, port_id=str(live_port).encode('ascii'))
         tlv_ttl = lldp.TTL(ttl=0)
         tlv_end = lldp.End()
         tlvs = (tlv_chassis_id, tlv_live_port, tlv_ttl, tlv_end)
+
         pkt.add_protocol(lldp.lldp(tlvs))
         pkt.serialize()
 
-        self.logger.info('packet_out %s', pkt)
+        # self.logger.info('packet_out %s', pkt)
 
-        # 製作完成後發送
-        # data = pkt.data
-        # parser = datapath.ofproto_parser
-        # actions = [parser.OFPActionOutput(port=live_port)]
-        # out = parser.OFPPacketOut(datapath=datapath, buffer_id=ofp.OFP_NO_BUFFER, in_port=ofp.OFPP_CONTROLLER,
-        #                           actions=actions, data=data)
-        # datapath.send_msg(out)
+        # ???????
+        data = pkt.data
+        parser = datapath.ofproto_parser
+        actions = [parser.OFPActionOutput(port=live_port)]
+        out = parser.OFPPacketOut(datapath=datapath, buffer_id=ofp.OFP_NO_BUFFER, in_port=ofp.OFPP_CONTROLLER,
+                                  actions=actions, data=data)
+        datapath.send_msg(out)
+
+    # @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
+    # def packet_in_handler(self, ev):
+    #     msg = ev.msg
+    #     datapath = msg.datapath
+    #     ofproto = datapath.ofproto
+    #     parser = datapath.ofproto_parser
+    #     pkt = packet.Packet(data=msg.data)
+    #     dpid = datapath.id  # switch id which send the packetin
+    #     in_port = msg.match['in_port']
+    #     pkt_ethernet = pkt.get_protocol(ethernet.ethernet)
+    #     pkt_lldp = pkt.get_protocol(lldp.lldp)
+    #     if not pkt_ethernet:
+    #         return
+    #     # print(pkt_lldp)
+    #     if pkt_lldp:
+    #         self.handle_lldp(dpid, in_port, pkt_lldp.tlvs[0].chassis_id, pkt_lldp.tlvs[1].port_id)
+    #
+    #
+    # def switch_link(self, s_a, s_b):
+    #     return s_a + '-->' + s_b
+    #
+    # def handle_lldp(self, dpid, in_port, lldp_dpid, lldp_in_port):
+    #     switch_a = 'switch'+str(dpid) +', port'+str(in_port)
+    #
+    #     switch_b = 'switch'+lldp_dpid +', port'+lldp_in_port
+    #     link = self.switch_link(switch_a, switch_b)  # Check the switch link is existed
+    #     if not any(self.switch_link(switch_b, switch_a) == search for search in self.link):
+    #         self.link.append(link)
+    #         print(self.link)
+
 
 
     @set_ev_cls(ofp_event.EventOFPPortStatus, MAIN_DISPATCHER)
