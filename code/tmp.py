@@ -1,169 +1,231 @@
 from ryu.base import app_manager
+from ryu.topology import event
+from ryu.topology.api import get_switch, get_link, get_host
 from ryu.controller import ofp_event
-from ryu.controller.handler import MAIN_DISPATCHER, CONFIG_DISPATCHER
+from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
-from ryu.ofproto import ether
+from ryu.ofproto import ofproto_v1_3_parser
+from ryu.lib.packet import ethernet
+from ryu.lib.packet import ether_types
+from ryu.lib.packet import lldp
+from ryu.lib.packet import packet
+import pandas as pd
 
-# packet
-
-from ryu.lib.packet import packet, ethernet, arp
-
-# topo
-from ryu.topology import event, switches
-from ryu.topology.api import get_switch, get_link
-
-import networkx as nx
-
-
-class shortest_path(app_manager.RyuApp):
+class good_controller(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
+    sw_dpid = dict()
+    sw_port_to_sw_port = []
+    live_port_index = 0
+    df = pd.DataFrame(columns=['switch_id', 'live_port', 'hw_addr'])
+    # lldp_df = pd.DataFrame(columns=['request_sid', 'request_port', 'receive_sid', 'receive_port'])
 
     def __init__(self, *args, **kwargs):
-        super(shortest_path, self).__init__(*args, **kwargs)
-        self.topology_api_app = self
-        self.net = nx.DiGraph()
-        self.switch_map = {}
-        self.arp_table = {'10.0.0.1': '00:00:00:00:00:01',
-                          '10.0.0.2': '00:00:00:00:00:02',
-                          '10.0.0.3': '00:00:00:00:00:03'}
+        super(good_controller, self).__init__(*args, **kwargs)
+
+    @set_ev_cls(event.EventSwitchEnter)
+    def get_switch(self, ev):
+
+        # self.topo_raw_switches = get_switch(self, None)
+        # self.topo_raw_links = get_link(self, None)
+        # self.topo_raw_hosts = get_host(self, None)
+        # # switches = [switch.dp.id for switch in self.topo_raw_switches]
+        # # ports = [port.port_no for port in self.topo_raw_switches]
+        # # print("switches: ", switches)
+        # # print("ports: ", ports)
+        #
+        # print(" \t" + "Current Switches:")
+        # for s in self.topo_raw_switches:
+        #     print(" \t\t" + str(s))
+        #     # print(" \t\t" + str(s.dp.id)) # print dpid
+        # print(" \t" + "Current Links:")
+        # for link in self.topo_raw_links:
+        #     print(" \t\t" + str(link))
+        # print(" \t" + "Current Hosts:")
+        # for host in self.topo_raw_hosts:
+        #     print(" \t\t" + str(host))
+
+        switch_list = get_switch(self, None)
+        switches = [switch.dp.id for switch in switch_list]
+        links_list = get_link(self, None)
+        links = [(link.src.dpid, link.dst.dpid, {'port': link.src.port_no}) for link in links_list]
+        # print(links)
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
-        dp = ev.msg.datapath
-        ofp = dp.ofproto
-        ofp_parser = dp.ofproto_parser
+        datapath = ev.msg.datapath
+        ofproto = datapath.ofproto
+        # parser = datapath.ofproto_parser
+        msg = ev.msg
 
-        self.switch_map.update({dp.id: dp})
-        match = ofp_parser.OFPMatch(eth_dst='ff:ff:ff:ff:ff:ff')
-        action = ofp_parser.OFPInstructionActions(ofp.OFPIT_APPLY_ACTIONS,
-                                                  [ofp_parser.OFPActionOutput(ofp.OFPP_CONTROLLER)])
-        inst = [action]
-        self.add_flow(dp=dp, match=match, inst=inst, table=0, priority=100)
+        self.send_port_stats_request(msg)
+        # print('=============================================')
+        # print('|          switch_features_handler          |')
+        # print('=============================================')
+        # print('...')
+        # print('..')
+        # print('.')
+
+    def send_port_stats_request(self, msg):
+        ofp = msg.datapath.ofproto
+        ofp_parser = msg.datapath.ofproto_parser
+
+        req = ofp_parser.OFPPortDescStatsRequest(msg.datapath, 0, ofp.OFPP_ANY)
+        msg.datapath.send_msg(req)
+
+    @set_ev_cls(ofp_event.EventOFPPortDescStatsReply, MAIN_DISPATCHER)
+    def port_stats_reply_handler(self, ev):
+        msg = ev.msg
+        datapath = ev.msg.datapath
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        tmp = []
+
+        # LLDP packet to controller
+        match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_LLDP)
+        actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
+        self.add_flow(datapath, 0, match, actions)
+
+        # Append stat.port_no to df's 'live_port' columns
+        for stat in ev.msg.body:
+            tmp.append(stat.hw_addr)
+
+            # Append ports(e.g. 1,2,3...) between switch and switch or host
+            if stat.port_no < ofproto_v1_3_parser.ofproto.OFPP_MAX:
+                self.df = self.df.append({'switch_id':datapath.id, 'live_port': stat.port_no, 'hw_addr': stat.hw_addr}, ignore_index=True)
+                self.send_lldp_packet(datapath, stat.port_no, stat.hw_addr)
+
+            # Append port(e.g. 4294967294) between switch and controller
+            else:
+
+                # 'at' just use int or float
+                # 'loc' can use int or float or string ......
+                # But 'at' faster to 'loc'
+                self.df = self.df.append({'switch_id': datapath.id, 'live_port': stat.port_no, 'hw_addr': stat.hw_addr},
+                                         ignore_index=True)
+
+        print('=============================================')
+        print('|         port_stats_reply_handler          |')
+        print('=============================================')
+        # print('df長度', len(self.df))
+        # print('tmp內容', tmp)
+        print('df內容', self.df)
+        print('...')
+        print('..')
+        print('.')
+
+        # -------------------------------------------------------------
+        # Log Mode
+
+        # from operator import attrgetter
+        # body = ev.msg.body
+        #
+        # self.logger.info('datapath         port     '
+        #                  'rx-pkts  rx-bytes rx-error '
+        #                  'tx-pkts  tx-bytes tx-error')
+        # self.logger.info('---------------- -------- '
+        #                  '-------- -------- -------- '
+        #                  '-------- -------- --------')
+        # for stat2 in sorted(body, key=attrgetter('port_no')):
+        #     self.logger.info('%016x %8x %8d %8d %8d %8d %8d %8d',
+        #                      ev.msg.datapath.id, stat2.port_no,
+        #                      stat2.rx_packets, stat2.rx_bytes, stat2.rx_errors,
+        #                      stat2.tx_packets, stat2.tx_bytes, stat2.tx_errors)
+        # -------------------------------------------------------------
+
+    def add_flow(self, datapath, priority, match, actions):
+        ofp = datapath.ofproto
+        parser = datapath.ofproto_parser
+
+        inst = [parser.OFPInstructionActions(ofp.OFPIT_APPLY_ACTIONS, actions)]
+
+        mod = parser.OFPFlowMod(datapath=datapath, priority=priority, command=ofp.OFPFC_ADD,
+                               match=match, instructions=inst)
+        datapath.send_msg(mod)
+
+    def send_lldp_packet(self, datapath, live_port, hw_addr):
+        ofp = datapath.ofproto
+
+        # 產生一個packet然後加上ethernet type為lldp
+        pkt = packet.Packet()
+        pkt.add_protocol(ethernet.ethernet(ethertype=ether_types.ETH_TYPE_LLDP,
+                                           src=hw_addr, dst=lldp.LLDP_MAC_NEAREST_BRIDGE))
+        tlv_chassis_id = lldp.ChassisID(subtype=lldp.ChassisID.SUB_LOCALLY_ASSIGNED, chassis_id=str(datapath.id).encode('ascii'))
+        tlv_live_port = lldp.PortID(subtype=lldp.PortID.SUB_LOCALLY_ASSIGNED, port_id=str(live_port).encode('ascii'))
+        tlv_ttl = lldp.TTL(ttl=0)
+        tlv_end = lldp.End()
+        tlvs = (tlv_chassis_id, tlv_live_port, tlv_ttl, tlv_end)
+        pkt.add_protocol(lldp.lldp(tlvs))
+        pkt.serialize()
+
+        # self.logger.info('packet_out %s', pkt)
+
+        # 製作完成後發送
+        data = pkt.data
+        parser = datapath.ofproto_parser
+        # print('live_port: ', live_port)
+        actions = [parser.OFPActionOutput(port=live_port)]
+        out = parser.OFPPacketOut(datapath=datapath, buffer_id=ofp.OFP_NO_BUFFER, in_port=ofp.OFPP_CONTROLLER,
+                                  actions=actions, data=data)
+        datapath.send_msg(out)
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def packet_in_handler(self, ev):
         msg = ev.msg
-        dp = msg.datapath
-        ofp = dp.ofproto
-        ofp_parser = dp.ofproto_parser
-
+        datapath = msg.datapath
         port = msg.match['in_port']
-
-        ## parses the packet
         pkt = packet.Packet(data=msg.data)
-        # ethernet
+
         pkt_ethernet = pkt.get_protocol(ethernet.ethernet)
-
         if not pkt_ethernet:
-            return
+            print('Not lldp packets')
 
-        # filters LLDP packet
-        if pkt_ethernet.ethertype == 35020:
-            return
+        pkt_lldp = pkt.get_protocol(lldp.lldp)
+        if pkt_lldp:
+            self.handle_lldp(datapath, port, pkt_ethernet, pkt_lldp)
 
-        # arp
-        pkt_arp = pkt.get_protocol(arp.arp)
-        if pkt_ethernet.ethertype == 2054:
-            print("arp")
-            self.handle_arp(dp, port, pkt_ethernet, pkt_arp)
-            return
-        # forwarded by shortest path
-        if not self.net.has_node(pkt_ethernet.src):
-            print("add %s in self.net" % pkt_ethernet.src)
-            self.net.add_node(pkt_ethernet.src)
-            self.net.add_edge(pkt_ethernet.src, dp.id)
-            self.net.add_edge(dp.id, pkt_ethernet.src, {'port': port})
-            print(self.net.node)
+        # print('=============================================')
+        # print('|         packet_in_handler          |')
+        # print('=============================================')
+        # print('msg.match[in_port]: ', port)
+        # print('packet.Packet(data=msg.data)內容', pkt)
+        # print('...')
+        # print('..')
+        # print('.')
 
-        if self.net.has_node(pkt_ethernet.dst):
-            print("%s in self.net" % pkt_ethernet.dst)
-            path = nx.shortest_path(self.net, pkt_ethernet.src, pkt_ethernet.dst)
-            next_match = ofp_parser.OFPMatch(eth_dst=pkt_ethernet.dst)
-            back_match = ofp_parser.OFPMatch(eth_dst=pkt_ethernet.src)
-            print(path)
-            for on_path_switch in range(1, len(path) - 1):
-                now_switch = path[on_path_switch]
-                next_switch = path[on_path_switch + 1]
-                back_switch = path[on_path_switch - 1]
-                next_port = self.net[now_switch][next_switch]['port']
-                back_port = self.net[now_switch][back_switch]['port']
-                action = ofp_parser.OFPInstructionActions(ofp.OFPIT_APPLY_ACTIONS,
-                                                          [ofp_parser.OFPActionOutput(next_port)])
-                inst = [action]
-                self.add_flow(dp=self.switch_map[now_switch], match=next_match, inst=inst, table=0)
+    def handle_lldp(self, datapath, port, pkt_ethernet, pkt_lldp):
 
-                action = ofp_parser.OFPInstructionActions(ofp.OFPIT_APPLY_ACTIONS,
-                                                          [ofp_parser.OFPActionOutput(back_port)])
-                inst = [action]
-                self.add_flow(dp=self.switch_map[now_switch], match=back_match, inst=inst, table=0)
-                print("now switch:%s" % now_switch)
+        # swp1我們紀錄封包是從哪個switch的哪個port發出
+        # swp2我們紀錄封包是從哪個switch的哪個port收到
+        swp1 = ["s"+str(datapath.id), "port "+str(port)]
+        swp2 = ["s"+str(pkt_lldp.tlvs[0].chassis_id), "port "+str(pkt_lldp.tlvs[1].port_id)]
+        self.sw_port_to_sw_port.append([swp1, swp2])
+        # print('LLDP結果: ', self.sw_port_to_sw_port)
+
+        # self.lldp_df = self.lldp_df.append({'request_sid': datapath.id,
+        #                                     'request_port': datapath.id,
+        #                                     'receive_sid': pkt_lldp.tlvs[0].chassis_id,
+        #                                     'receive_port': pkt_lldp.tlvs[1].port_id}, ignore_index=True)
+        # print(self.lldp_df)
+
+    @set_ev_cls(ofp_event.EventOFPPortStatus, MAIN_DISPATCHER)
+    def port_status_handler(self, ev):
+        msg = ev.msg
+        datapath = msg.datapath
+        ofp = datapath.ofproto
+
+        if msg.reason == ofp.OFPPR_ADD:
+            print('Add')
+            # reason = 'ADD'
+        elif msg.reason == ofp.OFPPR_DELETE:
+            print('Delete')
+            # reason = 'DELETE'
+        elif msg.reason == ofp.OFPPR_MODIFY:
+            print('Modify')
+            # reason = 'MODIFY'
         else:
-            return
+            print('Unknown')
+            # reason = 'unknown'
 
-    @set_ev_cls(event.EventSwitchEnter)
-    def get_topology_data(self, ev):
-        switch_list = get_switch(self.topology_api_app, None)
-        switches = [switch.dp.id for switch in switch_list]
-        links_list = get_link(self.topology_api_app, None)
-        links = [(link.src.dpid, link.dst.dpid, {'port': link.src.port_no}) for link in links_list]
-        print('links:', links)
-        self.net.add_nodes_from(switches)
-        self.net.add_edges_from(links)
-
-    def add_flow(self, dp, cookie=0, match=None, inst=[], table=0, priority=10):
-        ofp = dp.ofproto
-        ofp_parser = dp.ofproto_parser
-
-        buffer_id = ofp.OFP_NO_BUFFER
-
-        mod = ofp_parser.OFPFlowMod(
-            datapath=dp, cookie=cookie, table_id=table,
-            command=ofp.OFPFC_ADD, priority=priority, buffer_id=buffer_id,
-            out_port=ofp.OFPP_ANY, out_group=ofp.OFPG_ANY,
-            match=match, instructions=inst
-        )
-        dp.send_msg(mod)
-
-    def send_packet(self, dp, port, pkt):
-        ofproto = dp.ofproto
-        parser = dp.ofproto_parser
-        pkt.serialize()
-        data = pkt.data
-        action = [parser.OFPActionOutput(port=port)]
-
-        out = parser.OFPPacketOut(
-            datapath=dp, buffer_id=ofproto.OFP_NO_BUFFER,
-            in_port=ofproto.OFPP_CONTROLLER,
-            actions=action, data=data)
-
-        dp.send_msg(out)
-
-    def handle_arp(self, dp, port, pkt_ethernet, pkt_arp):
-        if pkt_arp.opcode != arp.ARP_REQUEST:
-            return
-
-        if self.arp_table.get(pkt_arp.dst_ip) == None:
-            return
-        get_mac = self.arp_table[pkt_arp.dst_ip]
-
-        pkt = packet.Packet()
-        pkt.add_protocol(
-            ethernet.ethernet(
-                ethertype=ether.ETH_TYPE_ARP,
-                dst=pkt_ethernet.src,
-                src=get_mac
-            )
-        )
-
-        pkt.add_protocol(
-            arp.arp(
-                opcode=arp.ARP_REPLY,
-                src_mac=get_mac,
-                src_ip=pkt_arp.dst_ip,
-                dst_mac=pkt_arp.src_mac,
-                dst_ip=pkt_arp.src_ip
-            )
-        )
-
-        self.send_packet(dp, port, pkt)
+        # self.logger.debug('OFPPortStatus received: reason=%s desc=%s',
+        #                   reason, msg.desc)

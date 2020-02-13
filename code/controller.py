@@ -18,6 +18,7 @@ class good_controller(app_manager.RyuApp):
     sw_port_to_sw_port = []
     live_port_index = 0
     df = pd.DataFrame(columns=['switch_id', 'live_port', 'hw_addr'])
+    lldp_df = pd.DataFrame(columns=['request_sid', 'request_port', 'receive_sid', 'receive_port'])
 
     def __init__(self, *args, **kwargs):
         super(good_controller, self).__init__(*args, **kwargs)
@@ -182,7 +183,7 @@ class good_controller(app_manager.RyuApp):
         pkt_lldp = pkt.get_protocol(lldp.lldp)
         if pkt_lldp:
             self.handle_lldp(datapath, port, pkt_ethernet, pkt_lldp)
-
+            print('send lldp packets')
         # print('=============================================')
         # print('|         packet_in_handler          |')
         # print('=============================================')
@@ -196,10 +197,20 @@ class good_controller(app_manager.RyuApp):
 
         # swp1我們紀錄封包是從哪個switch的哪個port發出
         # swp2我們紀錄封包是從哪個switch的哪個port收到
-        swp1 = ["s"+str(datapath.id), "port "+str(port)]
-        swp2 = ["s"+str(pkt_lldp.tlvs[0].chassis_id), "port "+str(pkt_lldp.tlvs[1].port_id)]
-        self.sw_port_to_sw_port.append([swp1, swp2])
-        print('LLDP結果: ', self.sw_port_to_sw_port)
+        # swp1 = ["s"+str(datapath.id), "port "+str(port)]
+        # swp2 = ["s"+str(pkt_lldp.tlvs[0].chassis_id), "port "+str(pkt_lldp.tlvs[1].port_id)]
+        # self.sw_port_to_sw_port.append([swp1, swp2])
+        # print('LLDP結果: ', self.sw_port_to_sw_port)
+
+        print('pkt_lldp.tlvs[1]: ', pkt_lldp.tlvs[1])
+        print('\n pkt_lldp.tlvs[1] type: ', type(pkt_lldp.tlvs[1]))
+        print('\n pkt_lldp.tlvs[1].port_id type: ', type(pkt_lldp.tlvs[1].port_id))
+
+        self.lldp_df = self.lldp_df.append({'request_sid': datapath.id,
+                                            'request_port': port,
+                                            'receive_sid': pkt_lldp.tlvs[0].chassis_id,
+                                            'receive_port': pkt_lldp.tlvs[1].port_id}, ignore_index=True)
+        print(self.lldp_df)
 
     @set_ev_cls(ofp_event.EventOFPPortStatus, MAIN_DISPATCHER)
     def port_status_handler(self, ev):
