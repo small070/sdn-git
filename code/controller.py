@@ -11,6 +11,7 @@ from ryu.lib.packet import ether_types
 from ryu.lib.packet import lldp
 from ryu.lib.packet import packet
 import pandas as pd
+import re
 
 class good_controller(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
@@ -81,7 +82,13 @@ class good_controller(app_manager.RyuApp):
         parser = datapath.ofproto_parser
         tmp = []
 
-        # LLDP packet to controller
+        # Table-miss Flow Entry
+        # Other packets Packet_Out controller
+        match = parser.OFPMatch()
+        actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
+        self.add_flow(datapath, 0, match, actions)
+
+        # LLDP packets Packet_In controller
         match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_LLDP)
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
         self.add_flow(datapath, 0, match, actions)
@@ -169,6 +176,7 @@ class good_controller(app_manager.RyuApp):
                                   actions=actions, data=data)
         datapath.send_msg(out)
 
+
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def packet_in_handler(self, ev):
         msg = ev.msg
@@ -179,19 +187,20 @@ class good_controller(app_manager.RyuApp):
         pkt_ethernet = pkt.get_protocol(ethernet.ethernet)
         if not pkt_ethernet:
             print('Not lldp packets')
+            return
 
         pkt_lldp = pkt.get_protocol(lldp.lldp)
         if pkt_lldp:
             self.handle_lldp(datapath, port, pkt_ethernet, pkt_lldp)
-            print('send lldp packets')
-        # print('=============================================')
-        # print('|         packet_in_handler          |')
-        # print('=============================================')
+
+        print('=============================================')
+        print('|            packet_in_handler              |')
+        print('=============================================')
         # print('msg.match[in_port]: ', port)
         # print('packet.Packet(data=msg.data)內容', pkt)
-        # print('...')
-        # print('..')
-        # print('.')
+        print('...')
+        print('..')
+        print('.')
 
     def handle_lldp(self, datapath, port, pkt_ethernet, pkt_lldp):
 
@@ -202,14 +211,19 @@ class good_controller(app_manager.RyuApp):
         # self.sw_port_to_sw_port.append([swp1, swp2])
         # print('LLDP結果: ', self.sw_port_to_sw_port)
 
-        print('pkt_lldp.tlvs[1]: ', pkt_lldp.tlvs[1])
-        print('\n pkt_lldp.tlvs[1] type: ', type(pkt_lldp.tlvs[1]))
-        print('\n pkt_lldp.tlvs[1].port_id type: ', type(pkt_lldp.tlvs[1].port_id))
+        # print('pkt_lldp.tlvs[1]: ', pkt_lldp.tlvs[1])
+        # print('\n pkt_lldp.tlvs[1] type: ', type(pkt_lldp.tlvs[1]))
+        # print('\n pkt_lldp.tlvs[1].port_id type: ', type(pkt_lldp.tlvs[1].port_id))
 
         self.lldp_df = self.lldp_df.append({'request_sid': datapath.id,
                                             'request_port': port,
-                                            'receive_sid': pkt_lldp.tlvs[0].chassis_id,
-                                            'receive_port': pkt_lldp.tlvs[1].port_id}, ignore_index=True)
+                                            'receive_sid': re.findall('\d', str(pkt_lldp.tlvs[0].chassis_id)),
+                                            'receive_port': re.findall('\d', str(pkt_lldp.tlvs[1].port_id))},
+                                            ignore_index=True)
+
+        # convert 'number' to number    e.g.:'2' to 2
+        self.lldp_df['receive_sid'] = self.lldp_df['receive_sid'].str.get(0)
+        self.lldp_df['receive_port'] = self.lldp_df['receive_port'].str.get(0)
         print(self.lldp_df)
 
     @set_ev_cls(ofp_event.EventOFPPortStatus, MAIN_DISPATCHER)

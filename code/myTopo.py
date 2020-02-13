@@ -75,10 +75,10 @@ class MyTopo(Topo):
         # self.addLink(self.host[25], self.switch[6])
         # self.addLink(self.host[26], self.switch[6])
         # self.addLink(self.host[27], self.switch[6])
-        #
-        # # switch to switch
-        # self.addLink(self.switch[0], self.switch[1])
-        # self.addLink(self.switch[1], self.switch[2])
+
+        # switch to switch
+        self.addLink(self.switch[0], self.switch[1])
+        self.addLink(self.switch[1], self.switch[2])
         # self.addLink(self.switch[2], self.switch[3])
         # self.addLink(self.switch[3], self.switch[4])
         # self.addLink(self.switch[4], self.switch[5])
