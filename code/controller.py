@@ -10,6 +10,10 @@ from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
 from ryu.lib.packet import lldp
 from ryu.lib.packet import packet
+from ryu.lib.packet import arp
+from ryu.lib.packet import icmp
+from ryu.lib.packet import tcp
+from ryu.lib.packet import udp
 import pandas as pd
 import re
 
@@ -192,6 +196,22 @@ class good_controller(app_manager.RyuApp):
         pkt_lldp = pkt.get_protocol(lldp.lldp)
         if pkt_lldp:
             self.handle_lldp(datapath, port, pkt_ethernet, pkt_lldp)
+
+        pkt_arp = pkt.get_protocol(arp.arp)
+        if pkt_arp:
+            print('Packet_in ARP')
+
+        pkt_icmp = pkt.get_protocol(icmp.icmp)
+        if pkt_icmp:
+            print('Packet_in ICMP')
+
+        pkt_tcp = pkt.get_protocol(tcp.tcp)
+        if pkt_tcp:
+            print('Packet_in TCP')
+
+        pkt_udp = pkt.get_protocol(udp.udp)
+        if pkt_udp:
+            print('Packet_in UDP')
 
         print('=============================================')
         print('|            packet_in_handler              |')
