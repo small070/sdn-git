@@ -1,9 +1,14 @@
 import pandas as pd
 import numpy as np
+import networkx as nx
 
 arr = []
 ev_msg_body = [429,1,2,429,1,2,3,429,1,2]
 df = pd.DataFrame(columns=['switch_id', 'live_port', 'hw_addr'])
+edges = pd.DataFrame({'source' : [0, 1],
+                      'target' : [1, 2],
+                      'weight' : [100, 50]})
+
 
 a = pd.Series(1)
 b = pd.Series(2)
@@ -58,7 +63,7 @@ df2 = df2.combine_first(df1)
 df = df.combine_first(df2)
 # print(df)
 df = df.dropna(axis=0).reset_index().drop(columns='index')
-print(df)
+# print(df)
 
 
 # df=df.append({'switch_id':4, 'live_port':8}, ignore_index=True)
@@ -82,3 +87,25 @@ print(df)
 #
 # print('後來的dataframe: ')
 # print(df)
+
+# print(edges)
+
+import networkx as nx
+net = nx.DiGraph()
+
+src_dpid = 1
+dst_dpid = 3
+port = 2
+
+links=[(src_dpid, dst_dpid, {'port': port})]
+net.add_edges_from(links)
+
+net.add_node('aa:bb:cc')
+net.add_edge(1, 'aa:bb:cc', attr_dict={'port': 3})
+net.add_edge('aa:bb:cc', 1)
+
+# self.network.add_node(src)
+# self.network.add_edge(dpid, src, attr_dict={'port': in_port})
+# self.network.add_edge(src, dpid)
+
+print(net.edges)

@@ -15,6 +15,8 @@ from ryu.lib.packet import icmp
 from ryu.lib.packet import tcp
 from ryu.lib.packet import udp
 import pandas as pd
+import networkx as nx
+import matplotlib.pyplot as plt
 import re
 
 class good_controller(app_manager.RyuApp):
@@ -22,39 +24,27 @@ class good_controller(app_manager.RyuApp):
     sw_dpid = dict()
     sw_port_to_sw_port = []
     live_port_index = 0
+
     df = pd.DataFrame(columns=['switch_id', 'live_port', 'hw_addr'])
     lldp_df = pd.DataFrame(columns=['request_sid', 'request_port', 'receive_sid', 'receive_port'])
 
     def __init__(self, *args, **kwargs):
         super(good_controller, self).__init__(*args, **kwargs)
+        self.topology_api_app = self
+        self.net = nx.DiGraph()
 
     @set_ev_cls(event.EventSwitchEnter)
-    def get_switch(self, ev):
+    def get_topology_data(self, ev):
 
-        # self.topo_raw_switches = get_switch(self, None)
-        # self.topo_raw_links = get_link(self, None)
-        # self.topo_raw_hosts = get_host(self, None)
-        # # switches = [switch.dp.id for switch in self.topo_raw_switches]
-        # # ports = [port.port_no for port in self.topo_raw_switches]
-        # # print("switches: ", switches)
-        # # print("ports: ", ports)
-        #
-        # print(" \t" + "Current Switches:")
-        # for s in self.topo_raw_switches:
-        #     print(" \t\t" + str(s))
-        #     # print(" \t\t" + str(s.dp.id)) # print dpid
-        # print(" \t" + "Current Links:")
-        # for link in self.topo_raw_links:
-        #     print(" \t\t" + str(link))
-        # print(" \t" + "Current Hosts:")
-        # for host in self.topo_raw_hosts:
-        #     print(" \t\t" + str(host))
-
-        switch_list = get_switch(self, None)
+        # not work
+        switch_list = get_switch(self.topology_api_app, None)
         switches = [switch.dp.id for switch in switch_list]
-        links_list = get_link(self, None)
+        links_list = get_link(self.topology_api_app, None)
         links = [(link.src.dpid, link.dst.dpid, {'port': link.src.port_no}) for link in links_list]
-        # print(links)
+        # print('switches: ', switches)
+        # print(links_list)
+        # print('link: ', links)
+
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
@@ -103,7 +93,7 @@ class good_controller(app_manager.RyuApp):
 
             # Append ports(e.g. 1,2,3...) between switch and switch or host
             if stat.port_no < ofproto_v1_3_parser.ofproto.OFPP_MAX:
-                self.df = self.df.append({'switch_id':datapath.id, 'live_port': stat.port_no, 'hw_addr': stat.hw_addr}, ignore_index=True)
+                self.df = self.df.append({'switch_id': datapath.id, 'live_port': stat.port_no, 'hw_addr': stat.hw_addr}, ignore_index=True)
                 self.send_lldp_packet(datapath, stat.port_no, stat.hw_addr)
 
             # Append port(e.g. 4294967294) between switch and controller
@@ -115,6 +105,11 @@ class good_controller(app_manager.RyuApp):
                 self.df = self.df.append({'switch_id': datapath.id, 'live_port': stat.port_no, 'hw_addr': stat.hw_addr},
                                          ignore_index=True)
 
+            # Record switch_id to node
+            if not self.net.has_node(datapath.id):
+                # self.net.add_nodes_from(str(datapath.id))    # networkx   ['2', '1', '3']     for list
+                self.net.add_node(datapath.id)    # networkx    [2, 1, 3]   for str
+                # print('nodes: ', self.net.nodes)
         print('=============================================')
         print('|         port_stats_reply_handler          |')
         print('=============================================')
@@ -193,34 +188,39 @@ class good_controller(app_manager.RyuApp):
             print('Not lldp packets')
             return
 
-        pkt_lldp = pkt.get_protocol(lldp.lldp)
+        pkt_lldp = pkt.get_protocol(lldp.lldp)      # pkt_test = pkt_ethernet.ethertype == 35020
+
         if pkt_lldp:
             self.handle_lldp(datapath, port, pkt_ethernet, pkt_lldp)
+            # nx.draw(self.net, with_labels=True)
+            # plt.show()
 
-        pkt_arp = pkt.get_protocol(arp.arp)
-        if pkt_arp:
-            print('Packet_in ARP')
 
-        pkt_icmp = pkt.get_protocol(icmp.icmp)
-        if pkt_icmp:
-            print('Packet_in ICMP')
+        # 功能還沒開發
+        # pkt_arp = pkt.get_protocol(arp.arp)
+        # if pkt_arp:
+        #     print('Packet_in ARP')
+        #
+        # pkt_icmp = pkt.get_protocol(icmp.icmp)
+        # if pkt_icmp:
+        #     print('Packet_in ICMP')
+        #
+        # pkt_tcp = pkt.get_protocol(tcp.tcp)
+        # if pkt_tcp:
+        #     print('Packet_in TCP')
+        #
+        # pkt_udp = pkt.get_protocol(udp.udp)
+        # if pkt_udp:
+        #     print('Packet_in UDP')
 
-        pkt_tcp = pkt.get_protocol(tcp.tcp)
-        if pkt_tcp:
-            print('Packet_in TCP')
-
-        pkt_udp = pkt.get_protocol(udp.udp)
-        if pkt_udp:
-            print('Packet_in UDP')
-
-        print('=============================================')
-        print('|            packet_in_handler              |')
-        print('=============================================')
-        # print('msg.match[in_port]: ', port)
-        # print('packet.Packet(data=msg.data)內容', pkt)
-        print('...')
-        print('..')
-        print('.')
+        # print('=============================================')
+        # print('|            packet_in_handler              |')
+        # print('=============================================')
+        # # print('msg.match[in_port]: ', port)
+        # # print('packet.Packet(data=msg.data)內容', pkt)
+        # print('...')
+        # print('..')
+        # print('.')
 
     def handle_lldp(self, datapath, port, pkt_ethernet, pkt_lldp):
 
@@ -237,14 +237,20 @@ class good_controller(app_manager.RyuApp):
 
         self.lldp_df = self.lldp_df.append({'request_sid': datapath.id,
                                             'request_port': port,
-                                            'receive_sid': re.findall('\d', str(pkt_lldp.tlvs[0].chassis_id)),
-                                            'receive_port': re.findall('\d', str(pkt_lldp.tlvs[1].port_id))},
+                                            'receive_sid': int(pkt_lldp.tlvs[0].chassis_id),
+                                            'receive_port': int(pkt_lldp.tlvs[1].port_id)},
                                             ignore_index=True)
 
-        # convert 'number' to number    e.g.:'2' to 2
-        self.lldp_df['receive_sid'] = self.lldp_df['receive_sid'].str.get(0)
-        self.lldp_df['receive_port'] = self.lldp_df['receive_port'].str.get(0)
-        print(self.lldp_df)
+        print('lldp_df: ', self.lldp_df)
+
+        # Record request_sid, receive_sid, receive_port to edge
+        # links = [(datapath.id, int(pkt_lldp.tlvs[0].chassis_id), {'port': int(pkt_lldp.tlvs[1].port_id)})]
+        # self.net.add_edges_from(links)
+        self.net.add_edge(datapath.id, int(pkt_lldp.tlvs[0].chassis_id))
+        print('net nodes: ', self.net.nodes)
+        print('net edges: ', self.net.edges)
+
+
 
     @set_ev_cls(ofp_event.EventOFPPortStatus, MAIN_DISPATCHER)
     def port_status_handler(self, ev):
@@ -252,18 +258,18 @@ class good_controller(app_manager.RyuApp):
         datapath = msg.datapath
         ofp = datapath.ofproto
 
-        if msg.reason == ofp.OFPPR_ADD:
-            print('Add')
-            # reason = 'ADD'
-        elif msg.reason == ofp.OFPPR_DELETE:
-            print('Delete')
-            # reason = 'DELETE'
-        elif msg.reason == ofp.OFPPR_MODIFY:
-            print('Modify')
-            # reason = 'MODIFY'
-        else:
-            print('Unknown')
-            # reason = 'unknown'
+        # if msg.reason == ofp.OFPPR_ADD:
+        #     print('Add')
+        #     # reason = 'ADD'
+        # elif msg.reason == ofp.OFPPR_DELETE:
+        #     print('Delete')
+        #     # reason = 'DELETE'
+        # elif msg.reason == ofp.OFPPR_MODIFY:
+        #     print('Modify')
+        #     # reason = 'MODIFY'
+        # else:
+        #     print('Unknown')
+        #     # reason = 'unknown'
 
         # self.logger.debug('OFPPortStatus received: reason=%s desc=%s',
         #                   reason, msg.desc)
