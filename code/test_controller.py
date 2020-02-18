@@ -107,5 +107,47 @@ net.add_edge('aa:bb:cc', 1)
 # self.network.add_node(src)
 # self.network.add_edge(dpid, src, attr_dict={'port': in_port})
 # self.network.add_edge(src, dpid)
+# print(net.edges)
 
-print(net.edges)
+
+tmp2_df = pd.DataFrame(columns=['request_sid', 'request_port', 'receive_sid', 'receive_port'])
+tmp2_df=tmp2_df.append({'request_sid': 3, 'request_port': 2, 'receive_sid': 2, 'receive_port': 2}, ignore_index=True)
+tmp2_df=tmp2_df.append({'request_sid': 3, 'request_port': 1, 'receive_sid': 1, 'receive_port': 3}, ignore_index=True)
+tmp2_df=tmp2_df.append({'request_sid': 2, 'request_port': 1, 'receive_sid': 1, 'receive_port': 2}, ignore_index=True)
+tmp2_df=tmp2_df.append({'request_sid': 3, 'request_port': 3, 'receive_sid': 4, 'receive_port': 4}, ignore_index=True)
+tmp2_df=tmp2_df.append({'request_sid': 1, 'request_port': 4, 'receive_sid': 4, 'receive_port': 3}, ignore_index=True)
+tmp2_df=tmp2_df.append({'request_sid': 3, 'request_port': 4, 'receive_sid': 5, 'receive_port': 3}, ignore_index=True)
+tmp2_df=tmp2_df.append({'request_sid': 2, 'request_port': 3, 'receive_sid': 5, 'receive_port': 2}, ignore_index=True)
+tmp2_df=tmp2_df.append({'request_sid': 4, 'request_port': 5, 'receive_sid': 5, 'receive_port': 4}, ignore_index=True)
+
+print(tmp2_df)
+
+tmp  = dict({3: {3: [3], 1: [3, 1], 5: [3, 5], 4: [3, 4], 2: [3, 2]}, 1: {1: [1], 3: [1, 3], 4: [1, 4], 2: [1, 2], 5: [1, 3, 5]}, 5: {5: [5], 3: [5, 3], 4: [5, 4], 2: [5, 2], 1: [5, 3, 1]}, 4: {4: [4], 3: [4, 3], 5: [4, 5], 1: [4, 1], 2: [4, 3, 2]}, 2: {2: [2], 1: [2, 1], 3: [2, 3], 5: [2, 5], 4: [2, 1, 4]}}
+)
+# print('原始networkx所有資料: ', tmp)
+# print('資料的所有key: ', tmp.keys())
+# print('資料的所有values: ', tmp.values())
+# print('資料key = 3的所有資料: ', tmp[3])
+# print('資料key = 3的所有key: ', tmp[3].keys())
+# print('資料key = 3的所有資料', tmp[3].values())
+
+# tmp_df = pd.DataFrame(tmp[3].values())
+# print(tmp_df)
+tmp_df = pd.DataFrame(tmp)
+# print('原始資料塞進dataframe: \n', tmp_df)
+# print(tmp_df.loc[3])
+for m in tmp_df.index:
+    for i in tmp_df.loc[m]:
+        if len(i) == 2:
+            print(type(i), i[0], i[1])
+            print(tmp2_df[(tmp2_df['request_sid'] == i[0]) & (tmp2_df['receive_sid'] == i[1]) |
+                 (tmp2_df['request_sid'] == i[1]) & (tmp2_df['receive_sid'] == i[0])].iloc[0, 1])
+            print(tmp2_df[(tmp2_df['request_sid'] == i[0]) & (tmp2_df['receive_sid'] == i[1]) |
+                          (tmp2_df['request_sid'] == i[1]) & (tmp2_df['receive_sid'] == i[0])].iloc[0, 3])
+        # if len(i) == 3:
+        #     print(type(i), i[0], i[1], i[2])
+        #     print(tmp2_df[(tmp2_df['request_sid'] == i[0]) & (tmp2_df['receive_sid'] == i[1]) |
+        #          (tmp2_df['request_sid'] == i[1]) & (tmp2_df['receive_sid'] == i[0])].iloc[0, 3])
+
+# print(tmp_df.loc[[3]])
+# print(type(tmp_df.loc[3]), type(tmp_df.loc[[3]]))

@@ -18,6 +18,7 @@ import pandas as pd
 import networkx as nx
 import matplotlib.pyplot as plt
 import re
+import time
 
 class good_controller(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
@@ -27,6 +28,7 @@ class good_controller(app_manager.RyuApp):
 
     df = pd.DataFrame(columns=['switch_id', 'live_port', 'hw_addr'])
     lldp_df = pd.DataFrame(columns=['request_sid', 'request_port', 'receive_sid', 'receive_port'])
+
 
     def __init__(self, *args, **kwargs):
         super(good_controller, self).__init__(*args, **kwargs)
@@ -191,16 +193,15 @@ class good_controller(app_manager.RyuApp):
         pkt_lldp = pkt.get_protocol(lldp.lldp)      # pkt_test = pkt_ethernet.ethertype == 35020
 
         if pkt_lldp:
-            self.handle_lldp(datapath, port, pkt_ethernet, pkt_lldp)
+            self.handle_lldp(datapath, port, pkt_ethernet, pkt_lldp, ev)
             # nx.draw(self.net, with_labels=True)
             # plt.show()
 
-
         # 功能還沒開發
-        # pkt_arp = pkt.get_protocol(arp.arp)
-        # if pkt_arp:
-        #     print('Packet_in ARP')
-        #
+        pkt_arp = pkt.get_protocol(arp.arp)
+        if pkt_arp:
+            print('Packet_in ARP')
+            # self.shortest_path()
         # pkt_icmp = pkt.get_protocol(icmp.icmp)
         # if pkt_icmp:
         #     print('Packet_in ICMP')
@@ -222,7 +223,7 @@ class good_controller(app_manager.RyuApp):
         # print('..')
         # print('.')
 
-    def handle_lldp(self, datapath, port, pkt_ethernet, pkt_lldp):
+    def handle_lldp(self, datapath, port, pkt_ethernet, pkt_lldp, ev):
 
         # swp1我們紀錄封包是從哪個switch的哪個port發出
         # swp2我們紀錄封包是從哪個switch的哪個port收到
@@ -247,11 +248,55 @@ class good_controller(app_manager.RyuApp):
         # links = [(datapath.id, int(pkt_lldp.tlvs[0].chassis_id), {'port': int(pkt_lldp.tlvs[1].port_id)})]
         # self.net.add_edges_from(links)
         self.net.add_edge(datapath.id, int(pkt_lldp.tlvs[0].chassis_id))
+        self.net.add_edge(int(pkt_lldp.tlvs[0].chassis_id), datapath.id)
         print('net nodes: ', self.net.nodes)
         print('net edges: ', self.net.edges)
 
+        self.shortest_path(ev)
 
+        # if self.net.has_node(1) & self.net.has_node(5):
+        #     print(nx.has_path(self.net, 1, 5))
+        # if self.net.has_node(1) & self.net.has_node(5):
+            # nx.draw(self.net, with_labels=True)
+            # plt.show()
+            # print(nx.shortest_path(self.net, 1, 5))   # 單個最短路徑
 
+    # https: // blog.csdn.net / xuchenhuics / article / details / 44494249
+    def shortest_path(self, ev):
+        msg = ev.msg
+        datapath = msg.datapath
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        path_df = pd.DataFrame(dict(nx.all_pairs_dijkstra_path(self.net)))
+        # tmp = dict(nx.all_pairs_dijkstra_path(self.net))  # 全部最短路徑
+        # print(tmp)
+        # print(path_df)
+        for index in path_df.index:
+            for path in path_df.loc[index]:
+                if len(path) == 2:
+
+                    request_sid = self.lldp_df[(self.lldp_df['request_sid'] == path[0]) & (self.lldp_df['receive_sid'] == path[1]) |
+                                  (self.lldp_df['request_sid'] == path[1]) & (self.lldp_df['receive_sid'] == path[0])].iloc[0, 0]
+                    request_port = self.lldp_df[(self.lldp_df['request_sid'] == path[0]) & (self.lldp_df['receive_sid'] == path[1]) |
+                                  (self.lldp_df['request_sid'] == path[1]) & (self.lldp_df['receive_sid'] == path[0])].iloc[0, 1]
+                    receive_sid = self.lldp_df[(self.lldp_df['request_sid'] == path[0]) & (self.lldp_df['receive_sid'] == path[1]) |
+                                  (self.lldp_df['request_sid'] == path[1]) & (self.lldp_df['receive_sid'] == path[0])].iloc[0, 2]
+                    receive_port = self.lldp_df[(self.lldp_df['request_sid'] == path[0]) & (self.lldp_df['receive_sid'] == path[1]) |
+                                  (self.lldp_df['request_sid'] == path[1]) & (self.lldp_df['receive_sid'] == path[0])].iloc[0, 3]
+                    print(type(path), path)
+                    print(self.lldp_df[(self.lldp_df['request_sid'] == path[0]) & (self.lldp_df['receive_sid'] == path[1]) |
+                         (self.lldp_df['request_sid'] == path[1]) & (self.lldp_df['receive_sid'] == path[0])].iloc[0, 1])
+                    print(self.lldp_df[(self.lldp_df['request_sid'] == path[0]) & (self.lldp_df['receive_sid'] == path[1]) |
+                         (self.lldp_df['request_sid'] == path[1]) & (self.lldp_df['receive_sid'] == path[0])].iloc[0, 3])
+
+                    match = parser.OFPMatch(in_port=receive_port)
+                    actions = [parser.OFPActionOutput(request_port)]
+
+                    # self.add_flow(datapath, , 1, match, actions)
+                    self.add_flow(datapath, 1, match, actions)
+
+                if len(path) == 3:
+                    print(type(path), path)
     @set_ev_cls(ofp_event.EventOFPPortStatus, MAIN_DISPATCHER)
     def port_status_handler(self, ev):
         msg = ev.msg
