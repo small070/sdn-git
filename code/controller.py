@@ -15,6 +15,7 @@ from ryu.lib.packet import icmp
 from ryu.lib.packet import tcp
 from ryu.lib.packet import udp
 import pandas as pd
+import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import re
@@ -185,7 +186,13 @@ class good_controller(app_manager.RyuApp):
         port = msg.match['in_port']
         pkt = packet.Packet(data=msg.data)
 
+        eth = pkt.get_protocols(ethernet.ethernet)[0]
+        # print('eth', eth)
+        src_mac = eth.src
+        dst_mac = eth.dst
+
         pkt_ethernet = pkt.get_protocol(ethernet.ethernet)
+
         if not pkt_ethernet:
             print('Not lldp packets')
             return
@@ -201,7 +208,7 @@ class good_controller(app_manager.RyuApp):
         pkt_arp = pkt.get_protocol(arp.arp)
         if pkt_arp:
             print('Packet_in ARP')
-            # self.shortest_path()
+            self.handle_arp(datapath, port, pkt_ethernet, pkt_arp, src_mac, dst_mac)
         # pkt_icmp = pkt.get_protocol(icmp.icmp)
         # if pkt_icmp:
         #     print('Packet_in ICMP')
@@ -271,32 +278,62 @@ class good_controller(app_manager.RyuApp):
         # tmp = dict(nx.all_pairs_dijkstra_path(self.net))  # 全部最短路徑
         # print(tmp)
         # print(path_df)
-        for index in path_df.index:
-            for path in path_df.loc[index]:
-                if len(path) == 2:
 
-                    request_sid = self.lldp_df[(self.lldp_df['request_sid'] == path[0]) & (self.lldp_df['receive_sid'] == path[1]) |
-                                  (self.lldp_df['request_sid'] == path[1]) & (self.lldp_df['receive_sid'] == path[0])].iloc[0, 0]
-                    request_port = self.lldp_df[(self.lldp_df['request_sid'] == path[0]) & (self.lldp_df['receive_sid'] == path[1]) |
-                                  (self.lldp_df['request_sid'] == path[1]) & (self.lldp_df['receive_sid'] == path[0])].iloc[0, 1]
-                    receive_sid = self.lldp_df[(self.lldp_df['request_sid'] == path[0]) & (self.lldp_df['receive_sid'] == path[1]) |
-                                  (self.lldp_df['request_sid'] == path[1]) & (self.lldp_df['receive_sid'] == path[0])].iloc[0, 2]
-                    receive_port = self.lldp_df[(self.lldp_df['request_sid'] == path[0]) & (self.lldp_df['receive_sid'] == path[1]) |
-                                  (self.lldp_df['request_sid'] == path[1]) & (self.lldp_df['receive_sid'] == path[0])].iloc[0, 3]
-                    print(type(path), path)
-                    print(self.lldp_df[(self.lldp_df['request_sid'] == path[0]) & (self.lldp_df['receive_sid'] == path[1]) |
-                         (self.lldp_df['request_sid'] == path[1]) & (self.lldp_df['receive_sid'] == path[0])].iloc[0, 1])
-                    print(self.lldp_df[(self.lldp_df['request_sid'] == path[0]) & (self.lldp_df['receive_sid'] == path[1]) |
-                         (self.lldp_df['request_sid'] == path[1]) & (self.lldp_df['receive_sid'] == path[0])].iloc[0, 3])
 
-                    match = parser.OFPMatch(in_port=receive_port)
-                    actions = [parser.OFPActionOutput(request_port)]
+        # 轉成上三角矩陣
+        m, n = path_df.shape
+        path_df[:] = np.where(np.arange(m)[:, None] >= np.arange(n), np.nan, path_df)
 
-                    # self.add_flow(datapath, , 1, match, actions)
+        # 轉成完整矩陣
+        path_df = path_df.stack().reset_index()
+        path_df.columns = ['start_sid', 'end_sid', 'links']
+        # print(path_df)
+
+
+        for i in range(0, len(path_df), 1):
+            test = path_df.loc[i, 'links']
+            # print('第一個for: ', path_df.loc[i, 'links'])
+            n = 2
+            for link in [test[i:i + n] for i in range(0, len(test), 1)]:
+                if len(link) % 2 == 0:
+                    # print('第二個for: ', link)
+                    # print('第二個for: ', link[0], link[1])
+
+                    match = parser.OFPMatch(in_port = link[0])
+                    actions = [parser.OFPActionOutput(link[1])]
                     self.add_flow(datapath, 1, match, actions)
 
-                if len(path) == 3:
-                    print(type(path), path)
+                    match = parser.OFPMatch(in_port = link[1])
+                    actions = [parser.OFPActionOutput(link[0])]
+                    self.add_flow(datapath, 1, match, actions)
+
+    def handle_arp(self, datapath, port, pkt_ethernet, pkt_arp, src_mac, dst_mac):
+        if pkt_arp.opcode != arp.ARP_REQUEST:
+            return
+        pkt = packet.Packet()
+
+        pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype, dst=pkt_ethernet.src, src=src_mac))
+        pkt.add_protocol(
+            arp.arp(opcode=arp.ARP_REPLY, src_mac=src_mac, src_ip=pkt_arp.dst_ip, dst_mac=pkt_arp.src_mac,
+                    dst_ip=pkt_arp.src_ip))
+        # self.logger.info("Receive ARP_REQUEST,request IP is %s", pkt_arp.dst_ip)
+
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        pkt.serialize()
+        # if pkt.get_protocol(icmp.icmp):
+        #     self.logger.info("Send ICMP_ECHO_REPLY")
+        # if pkt.get_protocol(arp.arp):
+        #     self.logger.info("Send ARP_REPLY")
+        # self.logger.info("--------------------")
+        data = pkt.data
+        actions = [parser.OFPActionOutput(port=port)]
+        out = parser.OFPPacketOut(datapath=datapath, buffer_id=ofproto.OFP_NO_BUFFER, in_port=ofproto.OFPP_CONTROLLER,
+                                  actions=actions, data=data)
+        datapath.send_msg(out)
+
+
+
     @set_ev_cls(ofp_event.EventOFPPortStatus, MAIN_DISPATCHER)
     def port_status_handler(self, ev):
         msg = ev.msg

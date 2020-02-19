@@ -127,27 +127,45 @@ tmp  = dict({3: {3: [3], 1: [3, 1], 5: [3, 5], 4: [3, 4], 2: [3, 2]}, 1: {1: [1]
 # print('原始networkx所有資料: ', tmp)
 # print('資料的所有key: ', tmp.keys())
 # print('資料的所有values: ', tmp.values())
-# print('資料key = 3的所有資料: ', tmp[3])
+# print('資料key = 3的所有 資料: ', tmp[3])
 # print('資料key = 3的所有key: ', tmp[3].keys())
 # print('資料key = 3的所有資料', tmp[3].values())
 
 # tmp_df = pd.DataFrame(tmp[3].values())
 # print(tmp_df)
 tmp_df = pd.DataFrame(tmp)
-# print('原始資料塞進dataframe: \n', tmp_df)
+print('原始資料塞進dataframe: \n', tmp_df)
 # print(tmp_df.loc[3])
-for m in tmp_df.index:
-    for i in tmp_df.loc[m]:
-        if len(i) == 2:
-            print(type(i), i[0], i[1])
-            print(tmp2_df[(tmp2_df['request_sid'] == i[0]) & (tmp2_df['receive_sid'] == i[1]) |
-                 (tmp2_df['request_sid'] == i[1]) & (tmp2_df['receive_sid'] == i[0])].iloc[0, 1])
-            print(tmp2_df[(tmp2_df['request_sid'] == i[0]) & (tmp2_df['receive_sid'] == i[1]) |
-                          (tmp2_df['request_sid'] == i[1]) & (tmp2_df['receive_sid'] == i[0])].iloc[0, 3])
-        # if len(i) == 3:
-        #     print(type(i), i[0], i[1], i[2])
-        #     print(tmp2_df[(tmp2_df['request_sid'] == i[0]) & (tmp2_df['receive_sid'] == i[1]) |
-        #          (tmp2_df['request_sid'] == i[1]) & (tmp2_df['receive_sid'] == i[0])].iloc[0, 3])
+# for m in tmp_df.index:
+#     for i in tmp_df.loc[m]:
+#         if len(i) == 2:
+#             print(type(i), i[0], i[1])
+#             # print(tmp2_df[(tmp2_df['request_sid'] == i[0]) & (tmp2_df['receive_sid'] == i[1]) |
+#             #      (tmp2_df['request_sid'] == i[1]) & (tmp2_df['receive_sid'] == i[0])].iloc[0, 1])
+#             # print(tmp2_df[(tmp2_df['request_sid'] == i[0]) & (tmp2_df['receive_sid'] == i[1]) |
+#             #               (tmp2_df['request_sid'] == i[1]) & (tmp2_df['receive_sid'] == i[0])].iloc[0, 3])
+#         if len(i) == 3:
+#             print(type(i), i[0], i[1], i[2])
+#         #     print(tmp2_df[(tmp2_df['request_sid'] == i[0]) & (tmp2_df['receive_sid'] == i[1]) |
+#         #          (tmp2_df['request_sid'] == i[1]) & (tmp2_df['receive_sid'] == i[0])].iloc[0, 3])
 
 # print(tmp_df.loc[[3]])
 # print(type(tmp_df.loc[3]), type(tmp_df.loc[[3]]))
+
+# 轉成上三角矩陣
+m,n = tmp_df.shape
+tmp_df[:] = np.where(np.arange(m)[:,None] >= np.arange(n),np.nan,tmp_df)
+# 轉成完整矩陣
+tmp_df = tmp_df.stack().reset_index()
+tmp_df.columns = ['start_sid', 'end_sid', 'link']
+print(tmp_df)
+
+for i in range(0, len(tmp_df), 1):
+    test = tmp_df.loc[i, 'link']
+    print('第一個for: ', tmp_df.loc[i, 'link'])
+    # print(test[n:n+2])
+    n = 2
+    for link in [test[i:i + n] for i in range(0, len(test), 1)]:
+        if len(link)%2 == 0:
+            print('第二個for: ', link)
+            print('第二個for: ', link[0], link[1])
