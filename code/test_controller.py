@@ -169,3 +169,10 @@ for i in range(0, len(tmp_df), 1):
         if len(link)%2 == 0:
             print('第二個for: ', link)
             print('第二個for: ', link[0], link[1])
+
+
+
+
+{1: {'56:6c:96:ce:81:ef': 2, '2e:d7:1e:f3:ff:d3': 1},
+ 2: {'2e:d7:1e:f3:ff:d3': 2, '2e:80:ea:b3:10:b5': 2, 'be:1b:51:a8:22:a0': 1}}
+

@@ -42,12 +42,18 @@ class MyTopo(Topo):
 
         # Add lines
         # host to switch
+
         self.addLink(self.host[0], self.switch[0])
+        self.addLink(self.host[1], self.switch[1])
 
-        self.addLink(self.host[1], self.switch[4])
 
-        self.addLink(self.host[2], self.switch[3])
-        self.addLink(self.host[3], self.switch[3])
+
+        # self.addLink(self.host[0], self.switch[0])      # test = MyTopo(4, 5)    # host & switch
+        #
+        # self.addLink(self.host[1], self.switch[4])      # test = MyTopo(4, 5)    # host & switch
+        #
+        # self.addLink(self.host[2], self.switch[3])      # test = MyTopo(4, 5)    # host & switch
+        # self.addLink(self.host[3], self.switch[3])      # test = MyTopo(4, 5)    # host & switch
 
         # self.addLink(self.host[0], self.switch[0])
         #
@@ -85,17 +91,20 @@ class MyTopo(Topo):
         # self.addLink(self.host[27], self.switch[6])
 
         # switch to switch
+
         self.addLink(self.switch[0], self.switch[1])
-        self.addLink(self.switch[0], self.switch[2])
-        self.addLink(self.switch[0], self.switch[3])
 
-        self.addLink(self.switch[1], self.switch[2])
-        self.addLink(self.switch[1], self.switch[4])
-
-        self.addLink(self.switch[2], self.switch[3])
-        self.addLink(self.switch[2], self.switch[4])
-
-        self.addLink(self.switch[3], self.switch[4])
+        # self.addLink(self.switch[0], self.switch[1])    # test = MyTopo(4, 5)    # host & switch
+        # self.addLink(self.switch[0], self.switch[2])    # test = MyTopo(4, 5)    # host & switch
+        # self.addLink(self.switch[0], self.switch[3])    # test = MyTopo(4, 5)    # host & switch
+        #
+        # self.addLink(self.switch[1], self.switch[2])    # test = MyTopo(4, 5)    # host & switch
+        # self.addLink(self.switch[1], self.switch[4])    # test = MyTopo(4, 5)    # host & switch
+        #
+        # self.addLink(self.switch[2], self.switch[3])    # test = MyTopo(4, 5)    # host & switch
+        # self.addLink(self.switch[2], self.switch[4])    # test = MyTopo(4, 5)    # host & switch
+        #
+        # self.addLink(self.switch[3], self.switch[4])    # test = MyTopo(4, 5)    # host & switch
 
 
         # self.addLink(self.switch[0], self.switch[1])
@@ -111,7 +120,8 @@ class MyTopo(Topo):
 def creater():
     # test = MyTopo(6, 3)    # host & switch
     # test = MyTopo(28, 7)    # host & switch
-    test = MyTopo(4, 5)    # host & switch
+    # test = MyTopo(4, 5)    # host & switch
+    test = MyTopo(2, 2)
     test.create_host()
     test.create_switch()
     test.create_link()

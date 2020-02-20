@@ -29,6 +29,8 @@ class good_controller(app_manager.RyuApp):
 
     df = pd.DataFrame(columns=['switch_id', 'live_port', 'hw_addr'])
     lldp_df = pd.DataFrame(columns=['request_sid', 'request_port', 'receive_sid', 'receive_port'])
+    mac_to_port_df2 = pd.DataFrame()
+    mac_to_port_df = dict()
 
 
     def __init__(self, *args, **kwargs):
@@ -70,6 +72,16 @@ class good_controller(app_manager.RyuApp):
 
         req = ofp_parser.OFPPortDescStatsRequest(msg.datapath, 0, ofp.OFPP_ANY)
         msg.datapath.send_msg(req)
+
+    def add_flow(self, datapath, priority, match, actions):
+        ofp = datapath.ofproto
+        parser = datapath.ofproto_parser
+
+        inst = [parser.OFPInstructionActions(ofp.OFPIT_APPLY_ACTIONS, actions)]
+
+        mod = parser.OFPFlowMod(datapath=datapath, priority=priority, command=ofp.OFPFC_ADD,
+                               match=match, instructions=inst)
+        datapath.send_msg(mod)
 
     @set_ev_cls(ofp_event.EventOFPPortDescStatsReply, MAIN_DISPATCHER)
     def port_stats_reply_handler(self, ev):
@@ -142,16 +154,6 @@ class good_controller(app_manager.RyuApp):
         #                      stat2.tx_packets, stat2.tx_bytes, stat2.tx_errors)
         # -------------------------------------------------------------
 
-    def add_flow(self, datapath, priority, match, actions):
-        ofp = datapath.ofproto
-        parser = datapath.ofproto_parser
-
-        inst = [parser.OFPInstructionActions(ofp.OFPIT_APPLY_ACTIONS, actions)]
-
-        mod = parser.OFPFlowMod(datapath=datapath, priority=priority, command=ofp.OFPFC_ADD,
-                               match=match, instructions=inst)
-        datapath.send_msg(mod)
-
     def send_lldp_packet(self, datapath, live_port, hw_addr):
         ofp = datapath.ofproto
 
@@ -183,13 +185,23 @@ class good_controller(app_manager.RyuApp):
     def packet_in_handler(self, ev):
         msg = ev.msg
         datapath = msg.datapath
-        port = msg.match['in_port']
+        in_port = msg.match['in_port']
         pkt = packet.Packet(data=msg.data)
 
         eth = pkt.get_protocols(ethernet.ethernet)[0]
         # print('eth', eth)
         src_mac = eth.src
         dst_mac = eth.dst
+
+        dpid = datapath.id
+
+        self.logger.info("packet in %s %s %s %s", dpid, src_mac, dst_mac, in_port)
+
+        self.mac_to_port_df.setdefault(dpid, {})
+        self.mac_to_port_df[dpid][src_mac] = in_port
+        self.mac_to_port_df2 = pd.DataFrame(self.mac_to_port_df)
+        # self.mac_to_port_df2 = self.mac_to_port_df2.append({'dpid': dpid, 'src_mac': src_mac, 'in_port': in_port}, ignore_index=True)
+        # print('mac_to_port: ', self.mac_to_port_df)
 
         pkt_ethernet = pkt.get_protocol(ethernet.ethernet)
 
@@ -200,15 +212,17 @@ class good_controller(app_manager.RyuApp):
         pkt_lldp = pkt.get_protocol(lldp.lldp)      # pkt_test = pkt_ethernet.ethertype == 35020
 
         if pkt_lldp:
-            self.handle_lldp(datapath, port, pkt_ethernet, pkt_lldp, ev)
+            self.handle_lldp(datapath, in_port, pkt_ethernet, pkt_lldp, ev)
             # nx.draw(self.net, with_labels=True)
             # plt.show()
+            return
 
         # 功能還沒開發
         pkt_arp = pkt.get_protocol(arp.arp)
         if pkt_arp:
             print('Packet_in ARP')
-            self.handle_arp(datapath, port, pkt_ethernet, pkt_arp, src_mac, dst_mac)
+            self.handle_arp(datapath, in_port, pkt_ethernet, pkt_arp, src_mac, dst_mac)
+            return
         # pkt_icmp = pkt.get_protocol(icmp.icmp)
         # if pkt_icmp:
         #     print('Packet_in ICMP')
