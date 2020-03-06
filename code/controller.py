@@ -29,6 +29,7 @@ class good_controller(app_manager.RyuApp):
 
     df = pd.DataFrame(columns=['switch_id', 'live_port', 'hw_addr'])
     lldp_df = pd.DataFrame(columns=['request_sid', 'request_port', 'receive_sid', 'receive_port'])
+    host_df = pd.DataFrame(columns=['switch_id', 'live_port'])
     mac_to_port_df2 = pd.DataFrame()
     mac_to_port_df = dict()
 
@@ -323,6 +324,8 @@ class good_controller(app_manager.RyuApp):
 
     def handle_arp(self, datapath, port, pkt_ethernet, pkt_arp, src_mac, dst_mac):
         if pkt_arp.opcode == arp.ARP_REQUEST:
+            # print(self.df[(self.df['switch_id'] == self.lldp_df['request_sid']) & (self.df['live_port'] == self.lldp_df['request_port'])])
+
             print('ARP Request\n')
             print('src_mac: ', src_mac)
             print('dst_mac: ', dst_mac)
