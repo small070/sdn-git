@@ -29,7 +29,7 @@ class good_controller(app_manager.RyuApp):
 
     df = pd.DataFrame(columns=['switch_id', 'live_port', 'hw_addr'])
     lldp_df = pd.DataFrame(columns=['request_sid', 'request_port', 'receive_sid', 'receive_port'])
-    host_df = pd.DataFrame(columns=['switch_id', 'live_port'])
+    host_df = pd.DataFrame()
     mac_to_port_df2 = pd.DataFrame()
     mac_to_port_df = dict()
 
@@ -38,6 +38,8 @@ class good_controller(app_manager.RyuApp):
         super(good_controller, self).__init__(*args, **kwargs)
         self.topology_api_app = self
         self.net = nx.DiGraph()
+        self.hw_addr = '0a:e4:1c:d1:3e:44'
+        self.ip_addr = '192.0.2.9'
 
     @set_ev_cls(event.EventSwitchEnter)
     def get_topology_data(self, ev):
@@ -323,16 +325,36 @@ class good_controller(app_manager.RyuApp):
                     self.add_flow(datapath, 1, match, actions)
 
     def handle_arp(self, datapath, port, pkt_ethernet, pkt_arp, src_mac, dst_mac):
+        self.host_df = self.df.copy()
+        pkt = packet.Packet()
+
+        for i in range(0, len(self.lldp_df), 1):
+            request_index = self.df[(self.df['switch_id'] == self.lldp_df.at[i, 'request_sid']) & (self.df['live_port'] == self.lldp_df.at[i, 'request_port'])].index
+            receive_index = self.df[(self.df['switch_id'] == self.lldp_df.at[i, 'receive_sid']) & (self.df['live_port'] == self.lldp_df.at[i, 'receive_port'])].index
+            # controller_index = self.df[(self.df['live_port'] >= 429)].index
+            controller_index = self.df[(self.df['live_port'] >= ofproto_v1_3_parser.ofproto.OFPP_MAX)].index
+            self.host_df.drop(index=request_index, inplace=True)
+            self.host_df.drop(index=receive_index, inplace=True)
+            self.host_df.drop(index=controller_index, inplace=True)
+            self.host_df.reset_index(drop=True, inplace=True)
+        print("host_df:", self.host_df)
         if pkt_arp.opcode == arp.ARP_REQUEST:
             # print(self.df[(self.df['switch_id'] == self.lldp_df['request_sid']) & (self.df['live_port'] == self.lldp_df['request_port'])])
 
-            print('ARP Request\n')
-            print('src_mac: ', src_mac)
-            print('dst_mac: ', dst_mac)
-            print('pkt_arp.src_ip', pkt_arp.src_ip)
-            print('pkt_arp.dst_ip', pkt_arp.dst_ip)
-            print('port: ', port)
-            return
+            pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype, dst=pkt_ethernet.src, src=self.hw_addr))
+            pkt.add_protocol(arp.arp(opcode=arp.ARP_REQUEST, src_mac=self.hw_addr, src_ip=self.ip_addr, dst_mac=pkt_arp.src_mac, dst_ip=pkt_arp.src_ip))
+
+            # self.send_packet(datapath, port, pkt)
+            self.send_packet(datapath, self.host_df.at[0, 'live_port'], pkt)
+
+
+            # print('ARP Request\n')
+            # print('src_mac: ', src_mac)
+            # print('dst_mac: ', dst_mac)
+            # print('pkt_arp.src_ip', pkt_arp.src_ip)
+            # print('pkt_arp.dst_ip', pkt_arp.dst_ip)
+            # print('port: ', port)
+            # return
         elif pkt_arp.opcode == arp.ARP_REPLY:
             print('ARP Reply\n')
             print('src_mac: ', src_mac)
@@ -365,6 +387,15 @@ class good_controller(app_manager.RyuApp):
         #                           actions=actions, data=data)
         # datapath.send_msg(out)
 
+
+    def send_packet(self, datapath, port, pkt):
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        pkt.serialize()
+        data = pkt.data
+        actions = [parser.OFPActionOutput(port=port)]
+        out = parser.OFPPacketOut(datapath=datapath, buffer_id=ofproto.OFP_NO_BUFFER, in_port=ofproto.OFPP_CONTROLLER, actions=actions, data=data)
+        datapath.send_msg(out)
 
 
     @set_ev_cls(ofp_event.EventOFPPortStatus, MAIN_DISPATCHER)

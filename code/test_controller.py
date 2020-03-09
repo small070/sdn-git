@@ -116,6 +116,7 @@ net.add_edge('aa:bb:cc', 1)
 
 tmp2_df = pd.DataFrame(columns=['request_sid', 'request_port', 'receive_sid', 'receive_port'])
 tmp2_df=tmp2_df.append({'request_sid': 1, 'request_port': 2, 'receive_sid': 2, 'receive_port': 2}, ignore_index=True)
+tmp2_df=tmp2_df.append({'request_sid': 2, 'request_port': 2, 'receive_sid': 1, 'receive_port': 2}, ignore_index=True)
 # tmp2_df=tmp2_df.append({'request_sid': 3, 'request_port': 2, 'receive_sid': 2, 'receive_port': 2}, ignore_index=True)
 # tmp2_df=tmp2_df.append({'request_sid': 3, 'request_port': 1, 'receive_sid': 1, 'receive_port': 3}, ignore_index=True)
 # tmp2_df=tmp2_df.append({'request_sid': 2, 'request_port': 1, 'receive_sid': 1, 'receive_port': 2}, ignore_index=True)
@@ -129,14 +130,32 @@ print(df)
 print(tmp2_df)
 # print(df.info())
 # print(tmp2_df.info())
-for row in tmp2_df.itertuples():
-    print(getattr(row, 'request_sid'))
+# for row in tmp2_df.itertuples():
+#     print(getattr(row, 'request_sid'))
     # if (df['switch_id'] == getattr(row, 'request_sid')) & (df['live_port'] == getattr(row, 'request_port')):
     # if (df.iloc[0] == getattr(row, 'request_sid')) & (df.iloc[1] == getattr(row, 'request_port')):
     # if (df.loc['switch_id'] == 1):
     #     print('test')
-    if df.loc[df['switch_id'] == 1]:
-        print('test')
+# print(tmp2_df.request_sid)
+# print(tmp2_df[tmp2_df['request_sid'] == 1])
+df3 = df.copy()
+# for i, o in tmp2_df.request_sid, tmp2_df.request_port:
+#     print(i, o)
+#     print(df3[(df3['switch_id'] == i) & (df3['live_port'] == o)])
+
+for i in range(0, len(tmp2_df), 1):
+    print(df3[(df3['switch_id'] == tmp2_df.at[i, 'request_sid']) & (df3['live_port'] == tmp2_df.at[i, 'request_port'])])
+    request_index = df3[(df3['switch_id'] == tmp2_df.at[i, 'request_sid']) & (df3['live_port'] == tmp2_df.at[i, 'request_port'])].index
+    receive_index = df3[(df3['switch_id'] == tmp2_df.at[i, 'receive_sid']) & (df3['live_port'] == tmp2_df.at[i, 'receive_port'])].index
+    controller_index = df3[(df3['live_port'] > 429)].index
+    # print(type(index))
+    df3.drop(index=request_index, inplace=True)
+    df3.drop(index=receive_index, inplace=True)
+    df3.drop(index=controller_index, inplace=True)
+    df3.reset_index(drop=True, inplace=True)
+print(df3)
+
+
 # print(df[(df['switch_id'] == tmp2_df['request_sid'])])
 # print(df.loc[(df['switch_id'] == 1) & (df['live_port'] == 1)])
 # print(pd.concat([df, tmp2_df], axis=0))
