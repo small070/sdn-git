@@ -226,10 +226,10 @@ class good_controller(app_manager.RyuApp):
             print('Packet_in ARP')
             self.handle_arp(datapath, in_port, pkt_ethernet, pkt_arp, src_mac, dst_mac)
             return
-        # pkt_icmp = pkt.get_protocol(icmp.icmp)
-        # if pkt_icmp:
-        #     print('Packet_in ICMP')
-        #
+        pkt_icmp = pkt.get_protocol(icmp.icmp)
+        if pkt_icmp:
+            print('Packet_in ICMP')
+
         # pkt_tcp = pkt.get_protocol(tcp.tcp)
         # if pkt_tcp:
         #     print('Packet_in TCP')
@@ -327,6 +327,7 @@ class good_controller(app_manager.RyuApp):
     def handle_arp(self, datapath, port, pkt_ethernet, pkt_arp, src_mac, dst_mac):
         self.host_df = self.df.copy()
         pkt = packet.Packet()
+        parser = datapath.ofproto_parser
 
         for i in range(0, len(self.lldp_df), 1):
             request_index = self.df[(self.df['switch_id'] == self.lldp_df.at[i, 'request_sid']) & (self.df['live_port'] == self.lldp_df.at[i, 'request_port'])].index
@@ -346,18 +347,36 @@ class good_controller(app_manager.RyuApp):
             pkt.add_protocol(arp.arp(opcode=arp.ARP_REQUEST, src_mac=pkt_arp.src_mac, src_ip=pkt_arp.src_ip, dst_mac=pkt_arp.dst_mac, dst_ip=pkt_arp.dst_ip))
 
             # self.send_packet(datapath, port, pkt)
-            self.send_packet(datapath, self.host_df.at[0, 'live_port'], pkt)
-            self.send_packet(datapath, self.host_df.at[1, 'live_port'], pkt)
+            for i in range(0, len(self.host_df), 1):
+                self.send_packet(datapath, self.host_df.at[i, 'live_port'], pkt)
 
 
-            # print('ARP Request\n')
-            # print('src_mac: ', src_mac)
-            # print('dst_mac: ', dst_mac)
-            # print('pkt_arp.src_ip', pkt_arp.src_ip)
-            # print('pkt_arp.dst_ip', pkt_arp.dst_ip)
-            # print('port: ', port)
+            print('ARP Request\n')
+            print('src_mac: ', src_mac)
+            print('dst_mac: ', dst_mac)
+            print('pkt_arp.src_ip', pkt_arp.src_ip)
+            print('pkt_arp.dst_ip', pkt_arp.dst_ip)
+            print('port: ', port)
             # return
         elif pkt_arp.opcode == arp.ARP_REPLY:
+            pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype, dst=pkt_ethernet.dst, src=pkt_ethernet.src))
+            # pkt.add_protocol(arp.arp(opcode=arp.ARP_REQUEST, src_mac=self.hw_addr, src_ip=self.ip_addr, dst_mac=pkt_arp.dst_mac, dst_ip=pkt_arp.dst_ip))
+            pkt.add_protocol(arp.arp(opcode=arp.ARP_REPLY, src_mac=pkt_arp.src_mac, src_ip=pkt_arp.src_ip, dst_mac=pkt_arp.dst_mac,dst_ip=pkt_arp.dst_ip))
+
+            # self.send_packet(datapath, port, pkt)
+            for i in range(0, len(self.host_df), 1):
+                self.send_packet(datapath, self.host_df.at[i, 'live_port'], pkt)
+
+            match = parser.OFPMatch(in_port=self.host_df.at[0, 'live_port'])
+            actions = [parser.OFPActionOutput(self.host_df.at[1, 'live_port'])]
+            self.add_flow(datapath, 0, match, actions)
+
+            # port A to port B
+            match = parser.OFPMatch(in_port=self.host_df.at[1, 'live_port'])
+            actions = [parser.OFPActionOutput(self.host_df.at[0, 'live_port'])]
+            self.add_flow(datapath, 0, match, actions)
+
+
             print('ARP Reply\n')
             print('src_mac: ', src_mac)
             print('dst_mac: ', dst_mac)
