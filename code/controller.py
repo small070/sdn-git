@@ -331,8 +331,8 @@ class good_controller(app_manager.RyuApp):
         for i in range(0, len(self.lldp_df), 1):
             request_index = self.df[(self.df['switch_id'] == self.lldp_df.at[i, 'request_sid']) & (self.df['live_port'] == self.lldp_df.at[i, 'request_port'])].index
             receive_index = self.df[(self.df['switch_id'] == self.lldp_df.at[i, 'receive_sid']) & (self.df['live_port'] == self.lldp_df.at[i, 'receive_port'])].index
-            # controller_index = self.df[(self.df['live_port'] >= 429)].index
-            controller_index = self.df[(self.df['live_port'] >= ofproto_v1_3_parser.ofproto.OFPP_MAX)].index
+            controller_index = self.df[(self.df['live_port'] >= 50)].index
+            # controller_index = self.df[(self.df['live_port'] >= ofproto_v1_3_parser.ofproto.OFPP_MAX)].index
             self.host_df.drop(index=request_index, inplace=True)
             self.host_df.drop(index=receive_index, inplace=True)
             self.host_df.drop(index=controller_index, inplace=True)
@@ -341,11 +341,13 @@ class good_controller(app_manager.RyuApp):
         if pkt_arp.opcode == arp.ARP_REQUEST:
             # print(self.df[(self.df['switch_id'] == self.lldp_df['request_sid']) & (self.df['live_port'] == self.lldp_df['request_port'])])
 
-            pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype, dst=pkt_ethernet.src, src=self.hw_addr))
-            pkt.add_protocol(arp.arp(opcode=arp.ARP_REQUEST, src_mac=self.hw_addr, src_ip=self.ip_addr, dst_mac=pkt_arp.src_mac, dst_ip=pkt_arp.src_ip))
+            pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype, dst=pkt_ethernet.dst, src=pkt_ethernet.src))
+            # pkt.add_protocol(arp.arp(opcode=arp.ARP_REQUEST, src_mac=self.hw_addr, src_ip=self.ip_addr, dst_mac=pkt_arp.dst_mac, dst_ip=pkt_arp.dst_ip))
+            pkt.add_protocol(arp.arp(opcode=arp.ARP_REQUEST, src_mac=pkt_arp.src_mac, src_ip=pkt_arp.src_ip, dst_mac=pkt_arp.dst_mac, dst_ip=pkt_arp.dst_ip))
 
             # self.send_packet(datapath, port, pkt)
             self.send_packet(datapath, self.host_df.at[0, 'live_port'], pkt)
+            self.send_packet(datapath, self.host_df.at[1, 'live_port'], pkt)
 
 
             # print('ARP Request\n')
