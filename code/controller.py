@@ -311,6 +311,7 @@ class good_controller(app_manager.RyuApp):
             test = path_df.loc[i, 'links']
             # print('第一個for: ', path_df.loc[i, 'links'])
             n = 2
+            print('shortest path: ', path_df)
             for link in [test[i:i + n] for i in range(0, len(test), 1)]:
                 if len(link) % 2 == 0:
                     # print('第二個for: ', link)
