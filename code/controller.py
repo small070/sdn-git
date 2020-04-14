@@ -304,7 +304,9 @@ class good_controller(app_manager.RyuApp):
         # 轉成完整矩陣
         path_df = path_df.stack().reset_index()
         path_df.columns = ['start_sid', 'end_sid', 'links']
-        # print(path_df)
+        print('path_df: ', path_df)
+        print('msg: ', msg)
+
 
 
         for i in range(0, len(path_df), 1):
