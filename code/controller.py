@@ -347,50 +347,50 @@ class good_controller(app_manager.RyuApp):
         self.host_df.reset_index(drop=True, inplace=True)
         print("host_df:\n", self.host_df)
 
-        # if pkt_arp.opcode == arp.ARP_REQUEST:
-        #     # print(self.df[(self.df['switch_id'] == self.lldp_df['request_sid']) & (self.df['live_port'] == self.lldp_df['request_port'])])
-        #
-        #     pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype, dst=pkt_ethernet.dst, src=pkt_ethernet.src))
-        #     # pkt.add_protocol(arp.arp(opcode=arp.ARP_REQUEST, src_mac=self.hw_addr, src_ip=self.ip_addr, dst_mac=pkt_arp.dst_mac, dst_ip=pkt_arp.dst_ip))
-        #     pkt.add_protocol(arp.arp(opcode=arp.ARP_REQUEST, src_mac=pkt_arp.src_mac, src_ip=pkt_arp.src_ip, dst_mac=pkt_arp.dst_mac, dst_ip=pkt_arp.dst_ip))
-        #
-        #     print('host_df: \n', self.host_df)
-        #     for i in range(0, len(self.host_df), 1):
-        #         self.send_packet(datapath, self.host_df.at[i, 'live_port'], pkt)
-        #         print('host的port: ', self.host_df.at[i, 'live_port'])
-        #
-        #     print('ARP Request\n')
-        #     print('src_mac: ', src_mac)
-        #     print('dst_mac: ', dst_mac)
-        #     print('pkt_arp.src_ip', pkt_arp.src_ip)
-        #     print('pkt_arp.dst_ip', pkt_arp.dst_ip)
-        #     print('port: ', port)
+        if pkt_arp.opcode == arp.ARP_REQUEST:
+            # print(self.df[(self.df['switch_id'] == self.lldp_df['request_sid']) & (self.df['live_port'] == self.lldp_df['request_port'])])
+
+            pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype, dst=pkt_ethernet.dst, src=pkt_ethernet.src))
+            # pkt.add_protocol(arp.arp(opcode=arp.ARP_REQUEST, src_mac=self.hw_addr, src_ip=self.ip_addr, dst_mac=pkt_arp.dst_mac, dst_ip=pkt_arp.dst_ip))
+            pkt.add_protocol(arp.arp(opcode=arp.ARP_REQUEST, src_mac=pkt_arp.src_mac, src_ip=pkt_arp.src_ip, dst_mac=pkt_arp.dst_mac, dst_ip=pkt_arp.dst_ip))
+
+
+            for i in range(0, len(self.host_df), 1):
+                self.send_packet(datapath, self.host_df.at[i, 'live_port'], 0, pkt)
+                print('host的port: ', self.host_df.at[i, 'live_port'])
+
+            print('ARP Request\n')
+            print('src_mac: ', src_mac)
+            print('dst_mac: ', dst_mac)
+            print('pkt_arp.src_ip', pkt_arp.src_ip)
+            print('pkt_arp.dst_ip', pkt_arp.dst_ip)
+            print('port: ', port)
             # return
-        # elif pkt_arp.opcode == arp.ARP_REPLY:
-        #     pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype, dst=pkt_ethernet.dst, src=pkt_ethernet.src))
-        #     # pkt.add_protocol(arp.arp(opcode=arp.ARP_REQUEST, src_mac=self.hw_addr, src_ip=self.ip_addr, dst_mac=pkt_arp.dst_mac, dst_ip=pkt_arp.dst_ip))
-        #     pkt.add_protocol(arp.arp(opcode=arp.ARP_REPLY, src_mac=pkt_arp.src_mac, src_ip=pkt_arp.src_ip, dst_mac=pkt_arp.dst_mac,dst_ip=pkt_arp.dst_ip))
-        #
-        #     # self.send_packet(datapath, port, pkt)
-        #     for i in range(0, len(self.host_df), 1):
-        #         self.send_packet(datapath, self.host_df.at[i, 'live_port'], pkt)
-        #
-        #     match = parser.OFPMatch(in_port=self.host_df.at[0, 'live_port'])
-        #     actions = [parser.OFPActionOutput(self.host_df.at[1, 'live_port'])]
-        #     self.add_flow(datapath, 0, match, actions)
-        #
-        #     # port A to port B
-        #     match = parser.OFPMatch(in_port=self.host_df.at[1, 'live_port'])
-        #     actions = [parser.OFPActionOutput(self.host_df.at[0, 'live_port'])]
-        #     self.add_flow(datapath, 0, match, actions)
-        #
-        #
-        #     print('ARP Reply\n')
-        #     print('src_mac: ', src_mac)
-        #     print('dst_mac: ', dst_mac)
-        #     print('pkt_arp.src_ip', pkt_arp.src_ip)
-        #     print('pkt_arp.dst_ip', pkt_arp.dst_ip)
-        #     print('port: ', port)
+        elif pkt_arp.opcode == arp.ARP_REPLY:
+            pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype, dst=pkt_ethernet.dst, src=pkt_ethernet.src))
+            # pkt.add_protocol(arp.arp(opcode=arp.ARP_REQUEST, src_mac=self.hw_addr, src_ip=self.ip_addr, dst_mac=pkt_arp.dst_mac, dst_ip=pkt_arp.dst_ip))
+            pkt.add_protocol(arp.arp(opcode=arp.ARP_REPLY, src_mac=pkt_arp.src_mac, src_ip=pkt_arp.src_ip, dst_mac=pkt_arp.dst_mac,dst_ip=pkt_arp.dst_ip))
+
+            # # self.send_packet(datapath, port, pkt)
+            # for i in range(0, len(self.host_df), 1):
+            #     self.send_packet(datapath, self.host_df.at[i, 'live_port'], pkt)
+            #
+            # match = parser.OFPMatch(in_port=self.host_df.at[0, 'live_port'])
+            # actions = [parser.OFPActionOutput(self.host_df.at[1, 'live_port'])]
+            # self.add_flow(datapath, 0, match, actions)
+            #
+            # # port A to port B
+            # match = parser.OFPMatch(in_port=self.host_df.at[1, 'live_port'])
+            # actions = [parser.OFPActionOutput(self.host_df.at[0, 'live_port'])]
+            # self.add_flow(datapath, 0, match, actions)
+
+
+            print('ARP Reply\n')
+            print('src_mac: ', src_mac)
+            print('dst_mac: ', dst_mac)
+            print('pkt_arp.src_ip', pkt_arp.src_ip)
+            print('pkt_arp.dst_ip', pkt_arp.dst_ip)
+            print('port: ', port)
 
         # if pkt_arp.opcode != arp.ARP_REQUEST:
         #     return
@@ -417,13 +417,16 @@ class good_controller(app_manager.RyuApp):
         # datapath.send_msg(out)
 
 
-    def send_packet(self, datapath, port, pkt):
+    def send_packet(self, datapath, output_port, input_port, pkt):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
+        in_port = input_port
+        if in_port == 0:
+            in_port = ofproto.OFPP_CONTROLLER
         pkt.serialize()
         data = pkt.data
-        actions = [parser.OFPActionOutput(port=port)]
-        out = parser.OFPPacketOut(datapath=datapath, buffer_id=ofproto.OFP_NO_BUFFER, in_port=ofproto.OFPP_CONTROLLER, actions=actions, data=data)
+        actions = [parser.OFPActionOutput(port=output_port)]
+        out = parser.OFPPacketOut(datapath=datapath, buffer_id=ofproto.OFP_NO_BUFFER, in_port=in_port, actions=actions, data=data)
         datapath.send_msg(out)
 
 
