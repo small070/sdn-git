@@ -45,7 +45,8 @@ class MyTopo(Topo):
 
         self.addLink(self.host[0], self.switch[0])
         self.addLink(self.host[1], self.switch[2])
-        self.addLink(self.host[2], self.switch[3])
+        self.addLink(self.host[2], self.switch[2])
+        self.addLink(self.host[3], self.switch[3])
 
         # switch to switch
 
@@ -73,15 +74,15 @@ class MyTopo(Topo):
 #        \     /  \     /
 #         \  /      \  /
 #         s3----------s4
-#         /            \
-#        /              \
-#       h1               h3
+#         / \          \
+#        /   \          \
+#       h2   h3          h4
 
 
 
 
 def creater():
-    test = MyTopo(3, 6)     # host & switch
+    test = MyTopo(4, 6)     # host & switch
     test.create_host()
     test.create_switch()
     test.create_link()
