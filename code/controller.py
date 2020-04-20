@@ -9,6 +9,7 @@ from ryu.ofproto import ofproto_v1_3_parser
 from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
 from ryu.lib.packet import lldp
+from ryu.lib.packet import ipv4
 from ryu.lib.packet import packet
 from ryu.lib.packet import arp
 from ryu.lib.packet import icmp
@@ -21,6 +22,15 @@ import matplotlib.pyplot as plt
 import re
 import time
 
+
+#   顯示所有columns
+pd.set_option('display.max_columns', None)
+#   顯示所有rows
+pd.set_option('display.max_rows', None)
+#   設定colwidth為100，預設為50
+pd.set_option('max_colwidth',100)
+
+
 class good_controller(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
     sw_dpid = dict()
@@ -30,6 +40,7 @@ class good_controller(app_manager.RyuApp):
     df = pd.DataFrame(columns=['switch_id', 'live_port', 'hw_addr'])
     lldp_df = pd.DataFrame(columns=['request_sid', 'request_port', 'receive_sid', 'receive_port'])
     host_df = pd.DataFrame()
+    path_df = pd.DataFrame()
     mac_to_port_df2 = pd.DataFrame()
     mac_to_port_df = dict()
     global dp
@@ -129,16 +140,17 @@ class good_controller(app_manager.RyuApp):
             if not self.net.has_node(datapath.id):
                 # self.net.add_nodes_from(str(datapath.id))    # networkx   ['2', '1', '3']     for list
                 self.net.add_node(datapath.id)    # networkx    [2, 1, 3]   for str
+                # self.net.add_node(datapath.id, port=stat.port_no)    # networkx    [2, 1, 3]   for str
                 # print('nodes: ', self.net.nodes)
-        print('=============================================')
-        print('|         port_stats_reply_handler          |')
-        print('=============================================')
-        # print('df長度', len(self.df))
-        # print('tmp內容', tmp)
-        print('df內容', self.df)
-        print('...')
-        print('..')
-        print('.')
+        # print('=============================================')
+        # print('|         port_stats_reply_handler          |')
+        # print('=============================================')
+        # # print('df長度', len(self.df))
+        # # print('tmp內容', tmp)
+        # print('df內容', self.df)
+        # print('...')
+        # print('..')
+        # print('.')
 
         # -------------------------------------------------------------
         # Log Mode
@@ -209,6 +221,7 @@ class good_controller(app_manager.RyuApp):
         # print('mac_to_port: ', self.mac_to_port_df)
 
         pkt_ethernet = pkt.get_protocol(ethernet.ethernet)
+        pkt_ipv4 = pkt.get_protocol(ipv4.ipv4)
 
         if not pkt_ethernet:
             print('Not lldp packets')
@@ -231,6 +244,7 @@ class good_controller(app_manager.RyuApp):
         pkt_icmp = pkt.get_protocol(icmp.icmp)
         if pkt_icmp:
             print('Packet_in ICMP')
+            self.handle_icmp(datapath, in_port, pkt_ipv4, pkt_icmp, src_mac, dst_mac)
 
         # pkt_tcp = pkt.get_protocol(tcp.tcp)
         # if pkt_tcp:
@@ -275,8 +289,9 @@ class good_controller(app_manager.RyuApp):
         # self.net.add_edges_from(links)
         self.net.add_edge(datapath.id, int(pkt_lldp.tlvs[0].chassis_id))
         self.net.add_edge(int(pkt_lldp.tlvs[0].chassis_id), datapath.id)
-        print('net nodes: ', self.net.nodes)
-        print('net edges: ', self.net.edges)
+        # print('net nodes: ', self.net.nodes)
+        # print('net edges: ', self.net.edges)
+
 
         self.shortest_path(ev)
 
@@ -293,42 +308,27 @@ class good_controller(app_manager.RyuApp):
         datapath = msg.datapath
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
-        path_df = pd.DataFrame(dict(nx.all_pairs_dijkstra_path(self.net)))  # 全部最短路徑
+        self.path_df = pd.DataFrame(dict(nx.all_pairs_dijkstra_path(self.net)))  # 全部最短路徑
         # tmp = dict(nx.all_pairs_dijkstra_path(self.net))  # 全部最短路徑
         # print('tmp: \n', tmp)
+        print('data: ', self.net.nodes.data())
         # print('path_df: \n', path_df)
 
 
         # 轉成上三角矩陣
-        m, n = path_df.shape
-        path_df[:] = np.where(np.arange(m)[:, None] >= np.arange(n), np.nan, path_df)
+        m, n = self.path_df.shape
+        self.path_df[:] = np.where(np.arange(m)[:, None] >= np.arange(n), np.nan, self.path_df)
 
         # 轉成完整矩陣
-        path_df = path_df.stack().reset_index()
-        path_df.columns = ['start_sid', 'end_sid', 'links']
+        self.path_df = self.path_df.stack().reset_index()
+        self.path_df.columns = ['start_sid', 'end_sid', 'links']
 
-        # print('path_df: \n', path_df)
+        # print('path_df: \n', self.path_df)
 
-        for i in range(0, len(path_df), 1):
-            test = path_df.loc[i, 'links']
-            # print('第一個for: ', path_df.loc[i, 'links'])
-            n = 2
-
-            # for link in [test[i:i + n] for i in range(0, len(test), 1)]:
-            #     if len(link) % 2 == 0:
-            #         # print('第二個for: ', link)
-            #         # print('第二個for: ', link[0], link[1])
-            #
-            #         match = parser.OFPMatch(in_port = link[0])
-            #         actions = [parser.OFPActionOutput(link[1])]
-            #         self.add_flow(datapath, 1, match, actions)
-            #
-            #         match = parser.OFPMatch(in_port = link[1])
-            #         actions = [parser.OFPActionOutput(link[0])]
-            #         self.add_flow(datapath, 1, match, actions)
 
     def handle_arp(self, datapath, port, pkt_ethernet, pkt_arp, src_mac, dst_mac):
         self.host_df = self.df.copy()
+        self.host_df.rename(columns={"hw_addr": "ip"}, inplace=True)
         pkt = packet.Packet()
         parser = datapath.ofproto_parser
 
@@ -367,15 +367,15 @@ class good_controller(app_manager.RyuApp):
             for i in range(0, len(self.host_df), 1):
                 # self.send_packet(datapath, self.host_df.at[i, 'live_port'], 0, pkt)
                 self.send_packet(self.host_df.at[i, 'datapath'], self.host_df.at[i, 'live_port'], 0, pkt)
-                print('host的port: ', self.host_df.at[i, 'live_port'])
-                print('datapath id: ', self.host_df.at[i, 'datapath'].id)
+                # print('host的port: ', self.host_df.at[i, 'live_port'])
+                # print('datapath id: ', self.host_df.at[i, 'datapath'].id)
 
 
             print('ARP Request: ')
-            print('src_mac: ', src_mac)
-            print('dst_mac: ', dst_mac)
-            print('pkt_arp.src_ip', pkt_arp.src_ip)
-            print('pkt_arp.dst_ip', pkt_arp.dst_ip)
+            # print('src_mac: ', src_mac)
+            # print('dst_mac: ', dst_mac)
+            # print('pkt_arp.src_ip', pkt_arp.src_ip)
+            # print('pkt_arp.dst_ip', pkt_arp.dst_ip)
             # print('port: ', port)
 
 
@@ -383,52 +383,52 @@ class good_controller(app_manager.RyuApp):
         elif pkt_arp.opcode == arp.ARP_REPLY:
             pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype, dst=pkt_ethernet.dst, src=pkt_ethernet.src))
             pkt.add_protocol(arp.arp(opcode=arp.ARP_REPLY, src_mac=pkt_arp.src_mac, src_ip=pkt_arp.src_ip, dst_mac=pkt_arp.dst_mac,dst_ip=pkt_arp.dst_ip))
-            print('dp: ', dp)
-            print('dpid: ', dpid)
-            print('inport: ', inport)
+            # print('dp: ', dp)
+            # print('dpid: ', dpid)
+            # print('inport: ', inport)
             # self.send_packet(datapath, port, pkt)
             self.send_packet(dp, inport, port, pkt)
 
-            # match = parser.OFPMatch(in_port=self.host_df.at[0, 'live_port'])
-            # actions = [parser.OFPActionOutput(self.host_df.at[1, 'live_port'])]
-            # self.add_flow(datapath, 0, match, actions)
-            #
-            # # port A to port B
-            # match = parser.OFPMatch(in_port=self.host_df.at[1, 'live_port'])
-            # actions = [parser.OFPActionOutput(self.host_df.at[0, 'live_port'])]
-            # self.add_flow(datapath, 0, match, actions)
+            for i in range(0, len(self.host_df), 1):
+                # print(self.host_df.at[i, 'switch_id'])
+                # print(datapath.id)
+                # print(self.host_df.at[i, 'live_port'])
+                # print(port)
+                if (self.host_df.at[i, 'switch_id'] == datapath.id) & (self.host_df.at[i, 'live_port'] == port):
+                    # print('ip: ', self.host_df.at[i, 'ip'])
+                    self.host_df.at[i, 'ip'] = pkt_arp.src_ip
 
 
-            print('ARP Reply: ')
-            print('src_mac: ', src_mac)
-            print('dst_mac: ', dst_mac)
-            print('pkt_arp.src_ip', pkt_arp.src_ip)
-            print('pkt_arp.dst_ip', pkt_arp.dst_ip)
-            print('port: ', port)
 
-        # if pkt_arp.opcode != arp.ARP_REQUEST:
-        #     return
-        # pkt = packet.Packet()
-        #
-        # pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype, dst=pkt_ethernet.src, src=src_mac))
-        # pkt.add_protocol(
-        #     arp.arp(opcode=arp.ARP_REPLY, src_mac=src_mac, src_ip=pkt_arp.dst_ip, dst_mac=pkt_arp.src_mac,
-        #             dst_ip=pkt_arp.src_ip))
-        # # self.logger.info("Receive ARP_REQUEST,request IP is %s", pkt_arp.dst_ip)
-        #
-        # ofproto = datapath.ofproto
-        # parser = datapath.ofproto_parser
-        # pkt.serialize()
-        # # if pkt.get_protocol(icmp.icmp):
-        # #     self.logger.info("Send ICMP_ECHO_REPLY")
-        # # if pkt.get_protocol(arp.arp):
-        # #     self.logger.info("Send ARP_REPLY")
-        # # self.logger.info("--------------------")
-        # data = pkt.data
-        # actions = [parser.OFPActionOutput(port=port)]
-        # out = parser.OFPPacketOut(datapath=datapath, buffer_id=ofproto.OFP_NO_BUFFER, in_port=ofproto.OFPP_CONTROLLER,
-        #                           actions=actions, data=data)
-        # datapath.send_msg(out)
+            print('｜----------------ARP Reply:------------------｜')
+            print('｜            src_mac: ', src_mac, '            |')
+            print('｜            dst_mac: ', dst_mac, '            |')
+            print('｜      pkt_arp.src_ip', pkt_arp.src_ip, '      |')
+            print('｜      pkt_arp.dst_ip', pkt_arp.dst_ip, '      |')
+            print('｜               port: ', port, '               |')
+            print('|---------------------------------------------|')
+
+    def handle_icmp(self, datapath, port, pkt_ipv4, pkt_icmp, src_mac, dst_mac):
+        print('ICMP Request: ')
+        print('datapath.id: ', datapath.id)
+        print('src_mac: ', src_mac)
+        print('dst_mac: ', dst_mac)
+        print('pkt_ipv4: ', pkt_ipv4)
+        print('pkt_ipv4.src_ip', pkt_ipv4.src)
+        print('pkt_ipv4.dst_ip', pkt_ipv4.dst)
+        print('port: ', port)
+
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+
+        # print('host_df: ', self.host_df)
+        # print('path_df: ', self.path_df)
+        # print('shortest path: ', nx.dijkstra_path(self.net, 1, 3))
+
+        # ICMP packets Packet_In controller
+        # match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_ICMP, ipv4_src=pkt_ipv4.src, ipv4_dst=pkt_ipv4.dst, in_port=port)
+        # actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
+        # self.add_flow(datapath, 0, match, actions)
 
 
     def send_packet(self, datapath, output_port, input_port, pkt):
