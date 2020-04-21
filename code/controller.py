@@ -311,7 +311,6 @@ class good_controller(app_manager.RyuApp):
         self.path_df = pd.DataFrame(dict(nx.all_pairs_dijkstra_path(self.net)))  # 全部最短路徑
         # tmp = dict(nx.all_pairs_dijkstra_path(self.net))  # 全部最短路徑
         # print('tmp: \n', tmp)
-        print('data: ', self.net.nodes.data())
         # print('path_df: \n', path_df)
 
 
@@ -370,14 +369,17 @@ class good_controller(app_manager.RyuApp):
                 # print('host的port: ', self.host_df.at[i, 'live_port'])
                 # print('datapath id: ', self.host_df.at[i, 'datapath'].id)
 
-
-            print('ARP Request: ')
+            # print('=============================================')
+            # print('|               ARP Request                 |')
+            # print('=============================================')
             # print('src_mac: ', src_mac)
             # print('dst_mac: ', dst_mac)
             # print('pkt_arp.src_ip', pkt_arp.src_ip)
             # print('pkt_arp.dst_ip', pkt_arp.dst_ip)
             # print('port: ', port)
-
+            # print('...')
+            # print('..')
+            # print('.')
 
             # return
         elif pkt_arp.opcode == arp.ARP_REPLY:
@@ -398,31 +400,52 @@ class good_controller(app_manager.RyuApp):
                     # print('ip: ', self.host_df.at[i, 'ip'])
                     self.host_df.at[i, 'ip'] = pkt_arp.src_ip
 
+            # print('=============================================')
+            # print('|                ARP Reply                  |')
+            # print('=============================================')
+            # print('src_mac: ', src_mac)
+            # print('dst_mac: ', dst_mac)
+            # print('pkt_arp.src_ip', pkt_arp.src_ip)
+            # print('pkt_arp.dst_ip', pkt_arp.dst_ip)
+            # print('port: ', port)
+            # print('...')
+            # print('..')
+            # print('.')
 
-
-            print('｜----------------ARP Reply:------------------｜')
-            print('｜            src_mac: ', src_mac, '            |')
-            print('｜            dst_mac: ', dst_mac, '            |')
-            print('｜      pkt_arp.src_ip', pkt_arp.src_ip, '      |')
-            print('｜      pkt_arp.dst_ip', pkt_arp.dst_ip, '      |')
-            print('｜               port: ', port, '               |')
-            print('|---------------------------------------------|')
 
     def handle_icmp(self, datapath, port, pkt_ipv4, pkt_icmp, src_mac, dst_mac):
-        print('ICMP Request: ')
+
+        dst_sid = self.host_df[self.host_df['ip'] == pkt_ipv4.dst].switch_id
+        dst_port = self.host_df[self.host_df.ip == pkt_ipv4.dst].live_port
+        path = np.array(self.path_df[((self.path_df.start_sid == int(datapath.id)) & (self.path_df.end_sid == int(dst_sid))) |
+                        ((self.path_df.start_sid == int(dst_sid)) & (self.path_df.end_sid == int(datapath.id)))].links)
+
+
+        print('=============================================')
+        print('|              ICMP Request                 |')
+        print('=============================================')
         print('datapath.id: ', datapath.id)
         print('src_mac: ', src_mac)
         print('dst_mac: ', dst_mac)
-        print('pkt_ipv4: ', pkt_ipv4)
+        # print('pkt_ipv4: ', pkt_ipv4)
         print('pkt_ipv4.src_ip', pkt_ipv4.src)
         print('pkt_ipv4.dst_ip', pkt_ipv4.dst)
         print('port: ', port)
+        print('host_df switch_id: ', self.host_df[self.host_df['ip'] == pkt_ipv4.dst].switch_id)
+        print('host_df live_port: ', self.host_df[self.host_df.ip == pkt_ipv4.dst].live_port)
+        print('path_df links: ', self.path_df[((self.path_df.start_sid == int(datapath.id)) & (self.path_df.end_sid == int(dst_sid))) |
+                                              ((self.path_df.start_sid == int(dst_sid)) & (self.path_df.end_sid == int(datapath.id)))].links)
+        print('path: ', path[0][0])
+        print('...')
+        print('..')
+        print('.')
 
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
-        # print('host_df: ', self.host_df)
-        # print('path_df: ', self.path_df)
+        print('host_df: ', self.host_df)
+        print('path_df: ', self.path_df)
+        print('lldp_df: ', self.lldp_df)
         # print('shortest path: ', nx.dijkstra_path(self.net, 1, 3))
 
         # ICMP packets Packet_In controller
