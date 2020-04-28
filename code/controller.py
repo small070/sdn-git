@@ -41,6 +41,7 @@ class good_controller(app_manager.RyuApp):
     lldp_df = pd.DataFrame(columns=['request_sid', 'request_port', 'receive_sid', 'receive_port'])
     host_df = pd.DataFrame()
     path_df = pd.DataFrame()
+    same_df = pd.DataFrame()
     mac_to_port_df2 = pd.DataFrame()
     mac_to_port_df = dict()
     global dp
@@ -321,7 +322,6 @@ class good_controller(app_manager.RyuApp):
         # 轉成完整矩陣
         self.path_df = self.path_df.stack().reset_index()
         self.path_df.columns = ['start_sid', 'end_sid', 'links']
-
         # print('path_df: \n', self.path_df)
 
 
@@ -415,10 +415,16 @@ class good_controller(app_manager.RyuApp):
 
     def handle_icmp(self, datapath, port, pkt_ipv4, pkt_icmp, src_mac, dst_mac):
 
-        dst_sid = self.host_df[self.host_df['ip'] == pkt_ipv4.dst].switch_id
-        dst_port = self.host_df[self.host_df.ip == pkt_ipv4.dst].live_port
-        path = np.array(self.path_df[((self.path_df.start_sid == int(datapath.id)) & (self.path_df.end_sid == int(dst_sid))) |
-                        ((self.path_df.start_sid == int(dst_sid)) & (self.path_df.end_sid == int(datapath.id)))].links)
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+
+        dst_sid = self.host_df[self.host_df['ip'] == pkt_ipv4.dst].switch_id.values[0]
+        dst_sid_port = self.host_df[self.host_df.ip == pkt_ipv4.dst].live_port.values[0]
+        path = self.path_df[((self.path_df.start_sid == int(datapath.id)) & (self.path_df.end_sid == int(dst_sid))) |
+                        ((self.path_df.start_sid == int(dst_sid)) & (self.path_df.end_sid == int(datapath.id)))].links
+        path = np.array(path)
+        reverse_path = np.flip(path[0])
+        path = np.flip(reverse_path)
 
 
         print('=============================================')
@@ -431,22 +437,61 @@ class good_controller(app_manager.RyuApp):
         print('pkt_ipv4.src_ip', pkt_ipv4.src)
         print('pkt_ipv4.dst_ip', pkt_ipv4.dst)
         print('port: ', port)
-        print('host_df switch_id: ', self.host_df[self.host_df['ip'] == pkt_ipv4.dst].switch_id)
-        print('host_df live_port: ', self.host_df[self.host_df.ip == pkt_ipv4.dst].live_port)
-        print('path_df links: ', self.path_df[((self.path_df.start_sid == int(datapath.id)) & (self.path_df.end_sid == int(dst_sid))) |
-                                              ((self.path_df.start_sid == int(dst_sid)) & (self.path_df.end_sid == int(datapath.id)))].links)
-        print('path: ', path[0][0])
+        print('host_df switch_id: ', dst_sid)
+        print('host_df live_port: ', dst_sid_port)
+        print('path & length: ', path, '&', len(path))
+        print('reverse_path & length: ', reverse_path, '&', len(reverse_path))
         print('...')
         print('..')
         print('.')
 
-        ofproto = datapath.ofproto
-        parser = datapath.ofproto_parser
 
         print('host_df: ', self.host_df)
         print('path_df: ', self.path_df)
         print('lldp_df: ', self.lldp_df)
         # print('shortest path: ', nx.dijkstra_path(self.net, 1, 3))
+
+
+        for i in range(0, len(path)-1, 1):
+
+            # path's end SW
+            # (dst SW and dst HOST) entry
+            # if path[i] == path[-1]:     # i == (len(path[0]) - 1)
+            #     print('path is final: ', path[0][i])
+                # match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_ICMP, ipv4_src=pkt_ipv4.src, ipv4_dst=pkt_ipv4.dst, in_port=port)
+                # actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
+                # self.add_flow(datapath, 0, match, actions)
+
+
+            # (src SW and src HOST) entry
+            # (SW and SW) entry
+            # data[(data.LATITUDE>18) & (data.LATITUDE<20)]
+            print('request_port: ', self.lldp_df[((self.lldp_df.request_sid == int(path[i])) & (self.lldp_df.receive_sid == int(path[i+1]))) |
+                                                 ((self.lldp_df.request_sid == int(path[i+1])) & (self.lldp_df.receive_sid == int(path[i])))].request_port.values[0])
+            print('receive_port: ', self.lldp_df[((self.lldp_df.request_sid == int(path[i])) & (self.lldp_df.receive_sid == int(path[i+1]))) |
+                                                 ((self.lldp_df.request_sid == int(path[i+1])) & (self.lldp_df.receive_sid == int(path[i])))].receive_port.values[0])
+
+            if (len(path) >= 3):
+                print('same_sw_index: ', self.lldp_df[((self.lldp_df.request_sid == int(path[i])) & (self.lldp_df.receive_sid == int(path[i + 1]))) |
+                                                      ((self.lldp_df.request_sid == int(path[i + 1])) & (self.lldp_df.receive_sid == int(path[i])))].index.values)
+
+                same_sw_index = self.lldp_df[((self.lldp_df.request_sid == int(path[i])) & (self.lldp_df.receive_sid == int(path[i + 1]))) |
+                                                      ((self.lldp_df.request_sid == int(path[i + 1])) & (self.lldp_df.receive_sid == int(path[i])))].index.values
+
+                self.same_df = self.same_df.append(self.lldp_df[((self.lldp_df.request_sid == int(path[i])) & (self.lldp_df.receive_sid == int(path[i + 1]))) |
+                                            ((self.lldp_df.request_sid == int(path[i + 1])) & (self.lldp_df.receive_sid == int(path[i])))], ignore_index=True)
+
+        print('same_df: ', self.same_df)
+                # print('same_sw_request_port: ', )
+                # print('same_sw_receive_port: ', )
+
+            # match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_ICMP, ipv4_src=pkt_ipv4.src, ipv4_dst=pkt_ipv4.dst, in_port=port)
+                # actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
+                # self.add_flow(datapath, 0, match, actions)
+
+
+
+
 
         # ICMP packets Packet_In controller
         # match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_ICMP, ipv4_src=pkt_ipv4.src, ipv4_dst=pkt_ipv4.dst, in_port=port)
