@@ -41,7 +41,6 @@ class good_controller(app_manager.RyuApp):
     lldp_df = pd.DataFrame(columns=['request_sid', 'request_port', 'receive_sid', 'receive_port'])
     host_df = pd.DataFrame()
     path_df = pd.DataFrame()
-    same_df = pd.DataFrame()
     mac_to_port_df2 = pd.DataFrame()
     mac_to_port_df = dict()
     global dp
@@ -426,6 +425,12 @@ class good_controller(app_manager.RyuApp):
         reverse_path = np.flip(path[0])
         path = np.flip(reverse_path)
 
+        sw_index = 0
+        sw_request_sid = 0
+        sw_receive_sid = 0
+        sw_request_port = 0
+        sw_receive_port = 0
+        same_df = pd.DataFrame()
 
         print('=============================================')
         print('|              ICMP Request                 |')
@@ -453,6 +458,11 @@ class good_controller(app_manager.RyuApp):
 
 
         for i in range(0, len(path)-1, 1):
+            tmp_sw_request_sid = 0
+            tmp_sw_receive_sid = 0
+            tmp_sw_request_port = 0
+            tmp_sw_receive_port = 0
+
 
             # path's end SW
             # (dst SW and dst HOST) entry
@@ -466,24 +476,33 @@ class good_controller(app_manager.RyuApp):
             # (src SW and src HOST) entry
             # (SW and SW) entry
             # data[(data.LATITUDE>18) & (data.LATITUDE<20)]
-            print('request_port: ', self.lldp_df[((self.lldp_df.request_sid == int(path[i])) & (self.lldp_df.receive_sid == int(path[i+1]))) |
-                                                 ((self.lldp_df.request_sid == int(path[i+1])) & (self.lldp_df.receive_sid == int(path[i])))].request_port.values[0])
-            print('receive_port: ', self.lldp_df[((self.lldp_df.request_sid == int(path[i])) & (self.lldp_df.receive_sid == int(path[i+1]))) |
-                                                 ((self.lldp_df.request_sid == int(path[i+1])) & (self.lldp_df.receive_sid == int(path[i])))].receive_port.values[0])
 
-            if (len(path) >= 3):
-                print('same_sw_index: ', self.lldp_df[((self.lldp_df.request_sid == int(path[i])) & (self.lldp_df.receive_sid == int(path[i + 1]))) |
-                                                      ((self.lldp_df.request_sid == int(path[i + 1])) & (self.lldp_df.receive_sid == int(path[i])))].index.values)
+            tmp_sw_request_sid = self.lldp_df[((self.lldp_df.request_sid == int(path[i])) & (self.lldp_df.receive_sid == int(path[i + 1]))) |
+                                          ((self.lldp_df.request_sid == int(path[i + 1])) & (self.lldp_df.receive_sid == int(path[i])))].request_sid.values[0]
+            tmp_sw_receive_sid = self.lldp_df[((self.lldp_df.request_sid == int(path[i])) & (self.lldp_df.receive_sid == int(path[i + 1]))) |
+                                          ((self.lldp_df.request_sid == int(path[i + 1])) & (self.lldp_df.receive_sid == int(path[i])))].receive_sid.values[0]
+            tmp_sw_request_port = self.lldp_df[((self.lldp_df.request_sid == int(path[i])) & (self.lldp_df.receive_sid == int(path[i + 1]))) |
+                                          ((self.lldp_df.request_sid == int(path[i + 1])) & (self.lldp_df.receive_sid == int(path[i])))].request_port.values[0]
+            tmp_sw_receive_port = self.lldp_df[((self.lldp_df.request_sid == int(path[i])) & (self.lldp_df.receive_sid == int(path[i + 1]))) |
+                                          ((self.lldp_df.request_sid == int(path[i + 1])) & (self.lldp_df.receive_sid == int(path[i])))].receive_port.values[0]
 
-                same_sw_index = self.lldp_df[((self.lldp_df.request_sid == int(path[i])) & (self.lldp_df.receive_sid == int(path[i + 1]))) |
-                                                      ((self.lldp_df.request_sid == int(path[i + 1])) & (self.lldp_df.receive_sid == int(path[i])))].index.values
+            if sw_request_sid == tmp_sw_request_sid:
+                print('sw_request_port & tmp_sw_request_port: ', sw_request_port, tmp_sw_request_port)
+            elif sw_request_sid == tmp_sw_receive_sid:
+                print('sw_request_port & tmp_sw_receive_port: ', sw_request_port, tmp_sw_receive_port)
+            elif sw_receive_sid == tmp_sw_request_sid:
+                print('sw_receive_port & tmp_sw_request_port: ', sw_receive_port, tmp_sw_request_port)
+            elif sw_receive_sid == tmp_sw_receive_sid:
+                print('sw_receive_port & tmp_sw_receive_port: ', sw_receive_port, tmp_sw_receive_port)
 
-                self.same_df = self.same_df.append(self.lldp_df[((self.lldp_df.request_sid == int(path[i])) & (self.lldp_df.receive_sid == int(path[i + 1]))) |
-                                            ((self.lldp_df.request_sid == int(path[i + 1])) & (self.lldp_df.receive_sid == int(path[i])))], ignore_index=True)
+            # if event is over, local value copy to global vaule!!!
+            sw_request_sid = tmp_sw_request_sid
+            sw_receive_sid = tmp_sw_receive_sid
+            sw_request_port = tmp_sw_request_port
+            sw_receive_port = tmp_sw_receive_port
 
-        print('same_df: ', self.same_df)
-                # print('same_sw_request_port: ', )
-                # print('same_sw_receive_port: ', )
+
+
 
             # match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_ICMP, ipv4_src=pkt_ipv4.src, ipv4_dst=pkt_ipv4.dst, in_port=port)
                 # actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
