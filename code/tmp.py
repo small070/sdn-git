@@ -12,6 +12,4 @@ port='2'
 # print(('｜port: ' + port + '|').center(50, '-'))
 # print(('||').center(50, '-'))
 
-
-for i in range(0, 3, 1):
-    print(i)
+test = ''

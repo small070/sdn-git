@@ -451,6 +451,7 @@ class good_controller(app_manager.RyuApp):
         print('.')
 
 
+        print('df: ', self.df)
         print('host_df: ', self.host_df)
         print('path_df: ', self.path_df)
         print('lldp_df: ', self.lldp_df)
@@ -486,14 +487,96 @@ class good_controller(app_manager.RyuApp):
             tmp_sw_receive_port = self.lldp_df[((self.lldp_df.request_sid == int(path[i])) & (self.lldp_df.receive_sid == int(path[i + 1]))) |
                                           ((self.lldp_df.request_sid == int(path[i + 1])) & (self.lldp_df.receive_sid == int(path[i])))].receive_port.values[0]
 
+            # print('dpid: ', datapath.id)
+            # print('tmp_sw_request_sid & tmp_sw_request_port & tmp_sw_receive_sid & tmp_sw_receive_port',
+            #       tmp_sw_request_sid, tmp_sw_request_port, tmp_sw_receive_sid, tmp_sw_receive_port)
+            #
+            # test = self.df[self.df.switch_id == int(datapath.id)].datapath.values[0]
+            #
+            # match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=pkt_ipv4.src, ipv4_dst=pkt_ipv4.dst,
+            #                         in_port=port)
+            # actions = [parser.OFPActionOutput(tmp_sw_request_port)]
+            # self.add_flow(test, 0, match, actions)
+
+            if i == 0:
+                print('-----start-----')
+                print('tmp_sw_request_sid: ', tmp_sw_request_sid)
+                print('tmp_sw_request_port: ', tmp_sw_request_port)
+                print('tmp_sw_receive_sid: ', tmp_sw_receive_sid)
+                print('tmp_sw_receive_port: ', tmp_sw_receive_port)
+                print('path', path[0])
+                print('path', path[-1])
+                print('---------------')
+
+                if path[0] == tmp_sw_request_sid:
+                    test = self.df[self.df.switch_id == int(tmp_sw_request_sid)].datapath.values[0]
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=pkt_ipv4.src,
+                                            ipv4_dst=pkt_ipv4.dst, in_port=tmp_sw_request_port)
+                    actions = [parser.OFPActionOutput(port)]
+                    self.add_flow(test, 0, match, actions)
+                elif path[0] == tmp_sw_receive_sid:
+                    test = self.df[self.df.switch_id == int(tmp_sw_receive_sid)].datapath.values[0]
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=pkt_ipv4.src,
+                                            ipv4_dst=pkt_ipv4.dst, in_port=tmp_sw_receive_port)
+                    actions = [parser.OFPActionOutput(port)]
+                    self.add_flow(test, 0, match, actions)
+
+
             if sw_request_sid == tmp_sw_request_sid:
+                test = self.df[self.df.switch_id == int(tmp_sw_request_sid)].datapath.values[0]
+                print('id: ', test.id)
                 print('sw_request_port & tmp_sw_request_port: ', sw_request_port, tmp_sw_request_port)
+                match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=pkt_ipv4.src,
+                                        ipv4_dst=pkt_ipv4.dst, in_port=tmp_sw_request_port)
+                actions = [parser.OFPActionOutput(sw_request_port)]
+                self.add_flow(test, 0, match, actions)
             elif sw_request_sid == tmp_sw_receive_sid:
+                test = self.df[self.df.switch_id == int(tmp_sw_receive_sid)].datapath.values[0]
+                print('id: ', test.id)
                 print('sw_request_port & tmp_sw_receive_port: ', sw_request_port, tmp_sw_receive_port)
+                match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=pkt_ipv4.src,
+                                        ipv4_dst=pkt_ipv4.dst, in_port=tmp_sw_request_port)
+                actions = [parser.OFPActionOutput(sw_receive_port)]
+                self.add_flow(test, 0, match, actions)
             elif sw_receive_sid == tmp_sw_request_sid:
+                test = self.df[self.df.switch_id == int(tmp_sw_request_sid)].datapath.values[0]
+                print('id: ', test.id)
                 print('sw_receive_port & tmp_sw_request_port: ', sw_receive_port, tmp_sw_request_port)
+                match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=pkt_ipv4.src,
+                                        ipv4_dst=pkt_ipv4.dst, in_port=tmp_sw_receive_port)
+                actions = [parser.OFPActionOutput(sw_request_port)]
+                self.add_flow(test, 0, match, actions)
             elif sw_receive_sid == tmp_sw_receive_sid:
+                test = self.df[self.df.switch_id == int(tmp_sw_receive_sid)].datapath.values[0]
+                print('id: ', test.id)
                 print('sw_receive_port & tmp_sw_receive_port: ', sw_receive_port, tmp_sw_receive_port)
+                match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=pkt_ipv4.src,
+                                        ipv4_dst=pkt_ipv4.dst, in_port=tmp_sw_receive_port)
+                actions = [parser.OFPActionOutput(sw_receive_port)]
+                self.add_flow(test, 0, match, actions)
+
+
+            if i == (len(path)-2):
+                print('-----end-----')
+                print('tmp_sw_request_sid: ', tmp_sw_request_sid)
+                print('tmp_sw_request_port: ', tmp_sw_request_port)
+                print('tmp_sw_receive_sid: ', tmp_sw_receive_sid)
+                print('tmp_sw_receive_port: ', tmp_sw_receive_port)
+                print('---------------')
+
+                if path[-1] == tmp_sw_request_sid:
+                    test = self.df[self.df.switch_id == int(tmp_sw_request_sid)].datapath.values[0]
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=pkt_ipv4.src,
+                                            ipv4_dst=pkt_ipv4.dst, in_port=tmp_sw_request_port)
+                    actions = [parser.OFPActionOutput(port)]
+                    self.add_flow(test, 0, match, actions)
+                elif path[-1] == tmp_sw_receive_sid:
+                    test = self.df[self.df.switch_id == int(tmp_sw_receive_sid)].datapath.values[0]
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=pkt_ipv4.src,
+                                            ipv4_dst=pkt_ipv4.dst, in_port=tmp_sw_receive_port)
+                    actions = [parser.OFPActionOutput(port)]
+                    self.add_flow(test, 0, match, actions)
+
 
             # if event is over, local value copy to global vaule!!!
             sw_request_sid = tmp_sw_request_sid
