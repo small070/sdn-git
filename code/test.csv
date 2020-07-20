@@ -1,0 +1,3 @@
+,port_num,entry_num,packet_time,average_priority,average_hard_timeout,packet_ratio,label
+0,0,0,1,0,0,0,0
+1,0.0,0.0,1.0,0.0,0.0,0.0,0.0
