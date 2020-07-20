@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import datetime
 
 #   顯示所有columns
 pd.set_option('display.max_columns', None)
@@ -30,8 +31,30 @@ index = host_df[host_df.switch_id == 3].index.values
 # print(type(test))
 
 
-path = [1, 6, 5, 7]
+# path = [1, 6, 5, 7]
+#
+# for i in range(len(path)-1):
+#     # if i < len(path)-1:
+#     print(path[i], path[i+1])
 
-for i in range(len(path)-1):
-    # if i < len(path)-1:
-    print(path[i], path[i+1])
+tm = datetime.datetime.now()
+tm2 = datetime.datetime.now()
+tm3 = tm2-tm
+print(tm3)
+
+
+
+import os
+print(os.getcwd())
+
+import random
+dataset = pd.DataFrame()
+
+for i in range(0, 100):
+    delta = datetime.timedelta(seconds=1, microseconds=random.randint(1,999999))
+    tmp_packet_time = tm3 + delta
+    dataset = dataset.append({'packet_time': tmp_packet_time}, ignore_index=True)
+
+dataset.to_csv('time.csv')
+
+print(dataset)
