@@ -40,21 +40,24 @@ index = host_df[host_df.switch_id == 3].index.values
 tm = datetime.datetime.now()
 tm2 = datetime.datetime.now()
 tm3 = tm2-tm
-print(tm3)
+# print(tm3)
 
 
 
 import os
-print(os.getcwd())
+# print(os.getcwd())
 
 import random
 dataset = pd.DataFrame()
 
 for i in range(0, 100):
-    delta = datetime.timedelta(seconds=1, microseconds=random.randint(1,999999))
-    tmp_packet_time = tm3 + delta
-    dataset = dataset.append({'packet_time': tmp_packet_time}, ignore_index=True)
+    # delta = datetime.timedelta(seconds=1.0, microseconds=random.randint(1,2000))
+    # tmp_packet_time = tm3 + delta
+    # dataset = dataset.append({'packet_time': tmp_packet_time}, ignore_index=True)
+    dataset = dataset.append({'packet_time': random.uniform(0.000001,0.002501)}, ignore_index=True)
 
 dataset.to_csv('time.csv')
 
 print(dataset)
+# import sklearn
+# print("Sklearn verion is {}".format(sklearn.__version__))

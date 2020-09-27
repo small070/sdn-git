@@ -24,6 +24,8 @@ import os
 from operator import attrgetter
 from ryu.lib import hub
 import joblib
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import scale
 
 #   顯示所有columns
 pd.set_option('display.max_columns', None)
@@ -857,13 +859,17 @@ class MLDetection(good_controller):
             self.dataset = self.dataset.append({'port_num': self.port_num, 'entry_num': self.entry_num,
                                                 'packet_time': float(self.packet_time), 'average_priority': self.average_priority,
                                                 'average_hard_timeout': self.average_hard_timeout,
-                                                'packet_ratio': packet_ratio,'label': 0}, ignore_index=True)
+                                                'packet_ratio': packet_ratio,'label': ''}, ignore_index=True)
 
             self.dataset.to_csv('test.csv')
             x = pd.DataFrame(self.dataset, columns=['port_num', 'entry_num', 'packet_time', 'average_priority',
                                           'average_hard_timeout', 'packet_ratio'])
-            model = joblib.load('train_model.m')
-            print(model.predict(x.tail(1)))
+            std = StandardScaler()
+            x = std.fit_transform(x)
+            x = pd.DataFrame(x)
+            model = joblib.load('train_SVC_model.m')
+            # print('最後一筆: ', x)
+            print('預測為： ', model.predict(x.tail(1)))
 
 
 
