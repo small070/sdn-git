@@ -23,7 +23,7 @@ import datetime
 import os
 from operator import attrgetter
 from ryu.lib import hub
-
+import joblib
 
 #   顯示所有columns
 pd.set_option('display.max_columns', None)
@@ -759,7 +759,7 @@ class good_controller(app_manager.RyuApp):
     def send_packet(self, datapath, output_port, input_port, pkt):
         self.packet_out = self.packet_out + 1
         self.packet_out_time = datetime.datetime.now()
-        self.packet_time = self.packet_out_time - self.packet_in_time
+        self.packet_time = (self.packet_out_time - self.packet_in_time).total_seconds()
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         if input_port == 0:
@@ -853,14 +853,17 @@ class MLDetection(good_controller):
             print('self.priority: ', self.average_priority)
             print('self.average_hard_timeout: ', self.average_hard_timeout)
             print('label: ', 0)
-            delta = datetime.timedelta(seconds=1)
-            tmp_packet_time = self.packet_time + delta
+
             self.dataset = self.dataset.append({'port_num': self.port_num, 'entry_num': self.entry_num,
-                                                'packet_time': tmp_packet_time, 'average_priority': self.average_priority,
+                                                'packet_time': float(self.packet_time), 'average_priority': self.average_priority,
                                                 'average_hard_timeout': self.average_hard_timeout,
                                                 'packet_ratio': packet_ratio,'label': 0}, ignore_index=True)
 
             self.dataset.to_csv('test.csv')
+            x = pd.DataFrame(self.dataset, columns=['port_num', 'entry_num', 'packet_time', 'average_priority',
+                                          'average_hard_timeout', 'packet_ratio'])
+            model = joblib.load('train_model.m')
+            print(model.predict(x.tail(1)))
 
 
 
