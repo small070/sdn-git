@@ -24,8 +24,7 @@ import os
 from operator import attrgetter
 from ryu.lib import hub
 import joblib
-from sklearn.preprocessing import StandardScaler
-from sklearn.preprocessing import scale
+from sklearn.preprocessing import MinMaxScaler
 
 #   顯示所有columns
 pd.set_option('display.max_columns', None)
@@ -817,7 +816,7 @@ class MLDetection(good_controller):
         self.port_num = 0
         self.average_hard_timeout = 0
         self.average_priority = 0
-        self.dataset = pd.DataFrame(columns=['port_num', 'entry_num', 'packet_time', 'average_priority',
+        self.dataset = pd.DataFrame(columns=['packet_time', 'average_priority',
                                              'average_hard_timeout', 'packet_ratio', 'label'])
 
     @set_ev_cls(ofp_event.EventOFPStateChange, [MAIN_DISPATCHER, DEAD_DISPATCHER])
@@ -856,18 +855,16 @@ class MLDetection(good_controller):
             print('self.average_hard_timeout: ', self.average_hard_timeout)
             print('label: ', 0)
 
-            self.dataset = self.dataset.append({'port_num': self.port_num, 'entry_num': self.entry_num,
-                                                'packet_time': float(self.packet_time), 'average_priority': self.average_priority,
+            self.dataset = self.dataset.append({'packet_time': float(self.packet_time), 'average_priority': self.average_priority,
                                                 'average_hard_timeout': self.average_hard_timeout,
                                                 'packet_ratio': packet_ratio,'label': ''}, ignore_index=True)
 
             self.dataset.to_csv('test.csv')
-            x = pd.DataFrame(self.dataset, columns=['port_num', 'entry_num', 'packet_time', 'average_priority',
-                                          'average_hard_timeout', 'packet_ratio'])
-            std = StandardScaler()
-            x = std.fit_transform(x)
+            x = pd.DataFrame(self.dataset, columns=['packet_time', 'average_priority', 'average_hard_timeout', 'packet_ratio'])
+            minMax = MinMaxScaler()
+            x = minMax.fit_transform(x)
             x = pd.DataFrame(x)
-            model = joblib.load('train_SVC_model.m')
+            model = joblib.load('train_KNN_model.m')
             # print('最後一筆: ', x)
             print('預測為： ', model.predict(x.tail(1)))
 
