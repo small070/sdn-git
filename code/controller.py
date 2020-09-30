@@ -95,7 +95,7 @@ class good_controller(app_manager.RyuApp):
 
         inst = [parser.OFPInstructionActions(ofp.OFPIT_APPLY_ACTIONS, actions)]
 
-        mod = parser.OFPFlowMod(datapath=datapath, priority=priority+1000, command=ofp.OFPFC_ADD,
+        mod = parser.OFPFlowMod(datapath=datapath, priority=priority, command=ofp.OFPFC_ADD,
                                match=match, instructions=inst, hard_timeout=500)
         datapath.send_msg(mod)
 
@@ -863,9 +863,9 @@ class MLDetection(good_controller):
             x = pd.DataFrame(self.dataset, columns=['packet_time', 'average_priority', 'average_hard_timeout', 'packet_ratio'])
             minMax = MinMaxScaler()
             x = minMax.fit_transform(x)
-            x = pd.DataFrame(x)
-            model = joblib.load('train_KNN_model.m')
-            # print('最後一筆: ', x)
+            x = pd.DataFrame(x, columns=['packet_time', 'average_priority', 'average_hard_timeout', 'packet_ratio'])
+            model = joblib.load('train_SVC_model.m')
+            print('最後一筆: ', x.tail(1))
             print('預測為： ', model.predict(x.tail(1)))
 
 
