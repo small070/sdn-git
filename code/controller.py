@@ -95,7 +95,7 @@ class good_controller(app_manager.RyuApp):
 
         inst = [parser.OFPInstructionActions(ofp.OFPIT_APPLY_ACTIONS, actions)]
 
-        mod = parser.OFPFlowMod(datapath=datapath, priority=priority, command=ofp.OFPFC_ADD,
+        mod = parser.OFPFlowMod(datapath=datapath, priority=priority+1000, command=ofp.OFPFC_ADD,
                                match=match, instructions=inst, hard_timeout=500)
         datapath.send_msg(mod)
 
