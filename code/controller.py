@@ -855,14 +855,14 @@ class MLDetection(good_controller):
             print('self.average_hard_timeout: ', self.average_hard_timeout)
             print('label: ', 0)
 
-            self.dataset = self.dataset.append({'packet_time': float(self.packet_time), 'average_priority': self.average_priority+1000,
+            self.dataset = self.dataset.append({'packet_time': float(self.packet_time), 'average_priority': self.average_priority,
                                                 'average_hard_timeout': self.average_hard_timeout,
                                                 'packet_ratio': packet_ratio,'label': ''}, ignore_index=True)
 
             self.dataset.to_csv('test.csv')
             x = pd.DataFrame(self.dataset, columns=['packet_time', 'average_priority', 'average_hard_timeout', 'packet_ratio'])
-            minMax = MinMaxScaler()
-            x = minMax.fit_transform(x)
+            # minMax = MinMaxScaler()
+            # x = minMax.fit_transform(x)
             x = pd.DataFrame(x, columns=['packet_time', 'average_priority', 'average_hard_timeout', 'packet_ratio'])
             model = joblib.load('train_SVC_model.m')
             print('最後一筆: ', x.tail(1))
