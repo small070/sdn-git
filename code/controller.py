@@ -300,9 +300,11 @@ class good_controller(app_manager.RyuApp):
             # print('Packet_in TCP')
             # self.handle_tcp(datapath, in_port, pkt, pkt_ethernet, pkt_ipv4, pkt_tcp, src_mac, dst_mac)
 
-        # pkt_udp = pkt.get_protocol(udp.udp)
-        # if pkt_udp:
-        #     print('Packet_in UDP')
+        pkt_udp = pkt.get_protocol(udp.udp)
+        if pkt_udp:
+            print('Packet_in UDP')
+            self.handle_udp(datapath, in_port, pkt, pkt_ethernet, pkt_ipv4, pkt_udp, src_mac, dst_mac)
+
 
         # print('=============================================')
         # print('|            packet_in_handler              |')
@@ -386,6 +388,9 @@ class good_controller(app_manager.RyuApp):
             return
         dst_sid = self.host_df.at[int(dst_index), 'switch_id']
         dst_sid_port = self.host_df.at[int(dst_index), 'live_port']
+        print('icmp_datapath_id: ', datapath.id)
+        print('icmp_dst_sid: ', dst_sid)
+
 
         if pkt_icmp.type == icmp.ICMP_ECHO_REQUEST:
             dst_dp = self.host_df.at[int(dst_index), 'datapath']
@@ -757,6 +762,162 @@ class good_controller(app_manager.RyuApp):
         # print('lldp_df: ', self.lldp_df)
         # print('shortest path: ', nx.dijkstra_path(self.net, 1, 3))
 
+
+    def handle_udp(self, datapath, port, pkt, pkt_ethernet, pkt_ipv4, pkt_udp, src_mac, dst_mac):
+        # print('handle_udp datapath_id: ', datapath.id)
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+
+        if pkt_ipv4.dst == None:
+            print("D----------N----------S")
+        else:
+            dst_index = self.host_df[self.host_df.ip == pkt_ipv4.dst].index.values
+
+        # print('pkt_ipv4.dst: ', pkt_ipv4.dst)
+        # print('host_df: \n', self.host_df)
+        # print('dst_index: ', dst_index)
+
+        while dst_index.size == 0:
+            print('host_df_ip not match ipv4_dst_ip')
+            return
+        dst_sid = self.host_df.at[int(dst_index), 'switch_id']
+        dst_sid_port = self.host_df.at[int(dst_index), 'live_port']
+
+        links_index = self.path_df[((self.path_df.start_sid == int(datapath.id)) & (self.path_df.end_sid == int(dst_sid)))].index.values
+        print('path_df: \n', self.path_df)
+        print('datapath_id: ', datapath.id)
+        print('dst_sid', dst_sid)
+        print('first links_index: ', links_index)
+
+        if links_index.size == 0:
+            links_index = self.path_df[((self.path_df.start_sid == int(dst_sid)) & (self.path_df.end_sid == int(datapath.id)))].index.values
+            # print('second links_index: ', links_index)
+
+        while links_index.size == 0:
+            # print('cant not find shortest path in path_df')
+            return
+
+        path = self.path_df.at[int(links_index), 'links']
+        print('UDP path: ', path)
+
+        # 3 up sw's link
+        for i in range(len(path) - 1):
+            if datapath.id == path[0]:
+                # print('reverse path')
+                path.reverse()
+
+                # link_index = self.lldp_df[((self.lldp_df.request_sid == int(path[i])) & (self.lldp_df.receive_sid == int(path[i+1])))].index.values
+                # request_port = self.lldp_df.at[int(link_index), 'request_port']
+                # receive_port = self.lldp_df.at[int(link_index), 'receive_port']
+                # print('link_index: ', link_index)
+                # print('request sid & port: ', path[i], '&', request_port)
+                # print('receive sid & port: ', path[i+1], '&', receive_port)
+
+            if datapath.id == path[-1]:
+                # print('normal path')
+                link_index = self.lldp_df[((self.lldp_df.request_sid == int(path[-i - 1])) & (
+                             self.lldp_df.receive_sid == int(path[-i - 2])))].index.values
+                request_port = self.lldp_df.at[int(link_index), 'request_port']
+                receive_port = self.lldp_df.at[int(link_index), 'receive_port']
+                # print('link_index: ', link_index)
+                # print('request sid & port: ', path[-i-1], '&', request_port)
+                # print('receive sid & port: ', path[-i-2], '&', receive_port)
+
+                # handle first sw
+                if i == 0:
+                    test_index = self.df[(self.df.switch_id == int(datapath.id)) &
+                                         (self.df.live_port == int(port))].index.values
+                    test_datapath = self.df.at[int(test_index), 'datapath']
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=pkt_ipv4.dst,
+                                            ipv4_dst=pkt_ipv4.src, in_port=request_port)
+                    actions = [parser.OFPActionOutput(port)]
+                    self.add_flow(test_datapath, 1, match, actions)
+
+                    test_index1 = self.df[(self.df.switch_id == int(datapath.id)) &
+                                          (self.df.live_port == int(port))].index.values
+                    test_datapath1 = self.df.at[int(test_index1), 'datapath']
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=pkt_ipv4.src,
+                                            ipv4_dst=pkt_ipv4.dst, in_port=port)
+                    actions = [parser.OFPActionOutput(request_port)]
+                    self.add_flow(test_datapath1, 1, match, actions)
+
+                    tmp_receive_port = receive_port
+
+                    # print('=============================================')
+                    # print('|             ADD Flow Entry                |')
+                    # print('=============================================')
+                    # print('start sw')
+                    # print('request sid & port: ', path[-i - 1], '&', request_port)
+                    # print('receive sid & port: ', path[-i - 2], '&', receive_port)
+                    # print('test_datapath.id: ', test_datapath.id)
+                    # print('in_port: ', port)
+                    # print('out_port: ', request_port)
+                    # print('...')
+                    # print('..')
+                    # print('.')
+
+                # handle mid sw
+                elif i != 0:
+                    test_index = self.df[(self.df.switch_id == int(path[-i - 1])) &
+                                         (self.df.live_port == int(request_port))].index.values
+                    test_datapath = self.df.at[int(test_index), 'datapath']
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=pkt_ipv4.dst,
+                                            ipv4_dst=pkt_ipv4.src, in_port=tmp_receive_port)
+                    actions = [parser.OFPActionOutput(request_port)]
+                    self.add_flow(test_datapath, 1, match, actions)
+
+                    test_index1 = self.df[(self.df.switch_id == int(path[-i - 1])) &
+                                          (self.df.live_port == int(request_port))].index.values
+                    test_datapath1 = self.df.at[int(test_index1), 'datapath']
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=pkt_ipv4.src,
+                                            ipv4_dst=pkt_ipv4.dst, in_port=request_port)
+                    actions = [parser.OFPActionOutput(tmp_receive_port)]
+                    self.add_flow(test_datapath1, 1, match, actions)
+
+                    # print('=============================================')
+                    # print('|             ADD Flow Entry                |')
+                    # print('=============================================')
+                    # print('mid sw')
+                    # print('request sid & port: ', path[-i - 1], '&', request_port)
+                    # print('receive sid & port: ', path[-i - 2], '&', receive_port)
+                    # print('tmp_port: ', tmp_receive_port)
+                    tmp_receive_port = receive_port
+
+                # handle end sw
+                elif (i == (len(path)-2)):
+                    test_index = self.df[(self.df.switch_id == int(path[-i - 2])) &
+                                         (self.df.live_port == int(tmp_receive_port))].index.values
+                    test_datapath = self.df.at[int(test_index), 'datapath']
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=pkt_ipv4.dst,
+                                            ipv4_dst=pkt_ipv4.src, in_port=request_port)
+                    actions = [parser.OFPActionOutput(tmp_receive_port)]
+                    self.add_flow(test_datapath, 1, match, actions)
+
+                    test_index1 = self.df[(self.df.switch_id == int(path[-i - 2])) &
+                                          (self.df.live_port == int(tmp_receive_port))].index.values
+                    test_datapath1 = self.df.at[int(test_index1), 'datapath']
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=pkt_ipv4.src,
+                                            ipv4_dst=pkt_ipv4.dst, in_port=tmp_receive_port)
+                    actions = [parser.OFPActionOutput(request_port)]
+                    self.add_flow(test_datapath1, 1, match, actions)
+
+                    # print('=============================================')
+                    # print('|             ADD Flow Entry                |')
+                    # print('=============================================')
+                    # print('end sw')
+                    # print('request sid & port: ', path[-i - 1], '&', request_port)
+                    # print('receive sid & port: ', path[-i - 2], '&', receive_port)
+                    # print('tmp_port: ', tmp_receive_port)
+
+
+
+    # print('df: ', self.df)
+    # print('host_df: ', self.host_df)
+    # print('path_df: ', self.path_df)
+    # print('lldp_df: ', self.lldp_df)
+    # print('shortest path: ', nx.dijkstra_path(self.net, 1, 3))
+
+
     def send_packet(self, datapath, output_port, input_port, pkt):
         self.packet_out = self.packet_out + 1
         self.packet_out_time = datetime.datetime.now()
@@ -849,10 +1010,10 @@ class MLDetection(good_controller):
                 packet_ratio = 0
             else:
                 packet_ratio = (self.packet_out / self.packet_in)
-            print('self.packet_ratio: ', packet_ratio)
-            print('self.packet_time: ', self.packet_time)
-            print('self.priority: ', self.average_priority)
-            print('self.average_hard_timeout: ', self.average_hard_timeout)
+            print('self.packet_ratio: ', packet_ratio)  # feature5 PPT
+            print('self.packet_time: ', self.packet_time)   # feature1 APFT
+            print('self.priority: ', self.average_priority)     # feature2 FEP
+            print('self.average_hard_timeout: ', self.average_hard_timeout)     # feature3 FET
             print('label: ', 0)
 
             self.dataset = self.dataset.append({'packet_time': float(self.packet_time), 'average_priority': self.average_priority,
@@ -865,8 +1026,8 @@ class MLDetection(good_controller):
             # x = minMax.fit_transform(x)
             x = pd.DataFrame(x, columns=['packet_time', 'average_priority', 'average_hard_timeout', 'packet_ratio'])
             model = joblib.load('train_SVC_model.m')
-            print('最後一筆: ', x.tail(1))
-            print('預測為： ', model.predict(x.tail(1)))
+            print('最後一筆: \n', x.tail(1))
+            print('預測為： \n', model.predict(x.tail(1)))
 
 
 
@@ -900,7 +1061,8 @@ class MLDetection(good_controller):
             self.entry_num = self.entry_num + 1
             self.average_priority = self.average_priority + stat.priority
             self.average_hard_timeout = self.average_hard_timeout + stat.hard_timeout
-            # print(stat.match)
+            self.flags = stat.flags
+            # print('drop flow entry: ', self.flags)
 
 
         # self.logger.info('datapath         '
