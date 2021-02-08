@@ -1020,12 +1020,12 @@ class MLDetection(good_controller):
                                                 'average_hard_timeout': self.average_hard_timeout,
                                                 'packet_ratio': packet_ratio,'label': ''}, ignore_index=True)
 
-            self.dataset.to_csv('test.csv')
+            self.dataset.to_csv('ref_test.csv')
             x = pd.DataFrame(self.dataset, columns=['packet_time', 'average_priority', 'average_hard_timeout', 'packet_ratio'])
             # minMax = MinMaxScaler()
             # x = minMax.fit_transform(x)
             x = pd.DataFrame(x, columns=['packet_time', 'average_priority', 'average_hard_timeout', 'packet_ratio'])
-            model = joblib.load('train_SVC_model.m')
+            model = joblib.load('ref_train_SVC_model.m')
             print('最後一筆: \n', x.tail(1))
             print('預測為： \n', model.predict(x.tail(1)))
 
