@@ -1,4 +1,5 @@
 from ryu.base import app_manager
+import ryu.topology.switches
 from ryu.topology import event
 from ryu.topology.api import get_switch, get_link, get_host
 from ryu.controller import ofp_event
@@ -53,6 +54,7 @@ class good_controller(app_manager.RyuApp):
         self.packet_in_time = 0
         self.packet_out_time = 0
         self.packet_time = 0
+
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
@@ -768,7 +770,7 @@ class good_controller(app_manager.RyuApp):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
-        if pkt_ipv4.dst == None:
+        if pkt_ipv4 is None:
             print("D----------N----------S")
         else:
             dst_index = self.host_df[self.host_df.ip == pkt_ipv4.dst].index.values
@@ -958,7 +960,10 @@ class good_controller(app_manager.RyuApp):
 
 
 class MLDetection(good_controller):
+    # _CONTEXTS = {'switches': ryu.topology.switches.Switches}
+    # _CONTEXTS = {'ports': ryu.topology.switches.Port}
     def _reset_packet_inout(self):
+
         while True:
 
             # 重置數值
@@ -979,6 +984,11 @@ class MLDetection(good_controller):
         self.average_priority = 0
         self.dataset = pd.DataFrame(columns=['packet_time', 'average_priority',
                                              'average_hard_timeout', 'packet_ratio', 'label'])
+        self.sw_entry = pd.DataFrame(columns=['switch_id', 'entry_num'])
+
+        # self.switches = kwargs['switches']
+        # self.ports = kwargs['ports']
+        # ref 9 features
 
     @set_ev_cls(ofp_event.EventOFPStateChange, [MAIN_DISPATCHER, DEAD_DISPATCHER])
     def _state_change_handler(self, ev):
@@ -992,14 +1002,14 @@ class MLDetection(good_controller):
                 # self.logger.debug('unregister datapath: %016x', datapath.id)
                 del self.datapaths[datapath.id]
 
+
+    # 不斷apath列表中的sw發送Flow狀態請求和Port狀態請求
     def _monitor(self):
         while True:
             for dp in self.datapaths.values():
                 self._request_stats(dp)
 
             hub.sleep(5)
-
-
             # 定時統計監控資料
             print('self.entry_num: ', self.entry_num)
             print('self.drop_entry_num: ', 0)
@@ -1016,18 +1026,18 @@ class MLDetection(good_controller):
             print('self.average_hard_timeout: ', self.average_hard_timeout)     # feature3 FET
             print('label: ', 0)
 
-            self.dataset = self.dataset.append({'packet_time': float(self.packet_time), 'average_priority': self.average_priority,
-                                                'average_hard_timeout': self.average_hard_timeout,
-                                                'packet_ratio': packet_ratio,'label': ''}, ignore_index=True)
-
-            self.dataset.to_csv('ref_test.csv')
-            x = pd.DataFrame(self.dataset, columns=['packet_time', 'average_priority', 'average_hard_timeout', 'packet_ratio'])
-            # minMax = MinMaxScaler()
-            # x = minMax.fit_transform(x)
-            x = pd.DataFrame(x, columns=['packet_time', 'average_priority', 'average_hard_timeout', 'packet_ratio'])
-            model = joblib.load('ref_train_SVC_model.m')
-            print('最後一筆: \n', x.tail(1))
-            print('預測為： \n', model.predict(x.tail(1)))
+            # self.dataset = self.dataset.append({'packet_time': float(self.packet_time), 'average_priority': self.average_priority,
+            #                                     'average_hard_timeout': self.average_hard_timeout,
+            #                                     'packet_ratio': packet_ratio,'label': ''}, ignore_index=True)
+            #
+            # self.dataset.to_csv('ref_test.csv')
+            # x = pd.DataFrame(self.dataset, columns=['packet_time', 'average_priority', 'average_hard_timeout', 'packet_ratio'])
+            # # minMax = MinMaxScaler()
+            # # x = minMax.fit_transform(x)
+            # x = pd.DataFrame(x, columns=['packet_time', 'average_priority', 'average_hard_timeout', 'packet_ratio'])
+            # model = joblib.load('ref_train_SVC_model.m')
+            # print('最後一筆: \n', x.tail(1))
+            # print('預測為： \n', model.predict(x.tail(1)))
 
 
 
@@ -1036,6 +1046,7 @@ class MLDetection(good_controller):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
+        # Flow狀態請求
         # 每當重新統計時重置entry_num . average_timeout . average_priority
         req = parser.OFPFlowStatsRequest(datapath)
         datapath.send_msg(req)
@@ -1043,26 +1054,43 @@ class MLDetection(good_controller):
         self.average_hard_timeout = 0
         self.average_priority = 0
 
+        # 發送Port狀態請求
         # 每當重新統計時重置port_num
         req = parser.OFPPortStatsRequest(datapath, 0, ofproto.OFPP_ANY)
         datapath.send_msg(req)
         self.port_num = 0
 
+        # Flow Counter請求
+        cookie = cookie_mask = 0
+        match = parser.OFPMatch()
+        req = parser.OFPAggregateStatsRequest(datapath, 0, ofproto.OFPTT_ALL, ofproto.OFPP_ANY, ofproto.OFPG_ANY,
+                                              cookie, cookie_mask, match)
+        datapath.send_msg(req)
+
+
+
 
     @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
     def _flow_stats_reply_handler(self, ev):
         msg = ev.msg
-        body = ev.msg.body
-
+        body =msg.body
+        dpid = ev.msg.datapath.id
         # print('=============================================')
         # print('|         _flow_stats_reply_handler         |')
         # print('=============================================')
+
+
         for stat in body:
             self.entry_num = self.entry_num + 1
             self.average_priority = self.average_priority + stat.priority
             self.average_hard_timeout = self.average_hard_timeout + stat.hard_timeout
             self.flags = stat.flags
             # print('drop flow entry: ', self.flags)
+
+        # if dpid not in self.sw_entry['switch_id'].values:
+        #     self.sw_entry = self.sw_entry.append({'switch_id': dpid, 'entry_num': self.entry_num}, ignore_index=True)
+        #     self.entry_num = 0
+        # print('sw_entry: \n', self.sw_entry)
 
 
         # self.logger.info('datapath         '
@@ -1104,3 +1132,16 @@ class MLDetection(good_controller):
             if stat.port_no < ofproto_v1_3_parser.ofproto.OFPP_MAX:
                 self.port_num = self.port_num + 1
 
+    @set_ev_cls(ofp_event.EventOFPAggregateStatsReply, MAIN_DISPATCHER)
+    def aggregate_stats_reply_handler(self, ev):
+        body = ev.msg.body
+        # print(self.lldp_df)
+        degree = pd.DataFrame(self.lldp_df['request_sid'].value_counts())
+        degree.rename(columns={'request_sid': 'degree'}, inplace=True)
+        print(degree.columns.values.tolist())
+        print(degree)
+        print('dpid  &  flow counter: ', ev.msg.datapath.id, body.flow_count)
+        # self.logger.debug('AggregateStats: packet_count=%d byte_count=%d '
+        #                   'flow_count=%d',
+        #                   body.packet_count, body.byte_count,
+        #                   body.flow_count)
