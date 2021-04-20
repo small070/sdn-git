@@ -970,6 +970,8 @@ class MLDetection(good_controller):
             self.packet_in = 0
             self.packet_out = 0
             self.packet_time = 0
+            self.sw_num = 0
+            self.sfd = 0
             hub.sleep(5)
 
     def __init__(self, *args, **kwargs):
@@ -978,6 +980,7 @@ class MLDetection(good_controller):
         self.monitor_thread = hub.spawn(self._monitor)
         self.task_thread = hub.spawn(self._reset_packet_inout)
 
+        self.sw_num = 0
         self.entry_num = 0
         self.port_num = 0
         self.average_hard_timeout = 0
@@ -1011,6 +1014,7 @@ class MLDetection(good_controller):
 
             hub.sleep(5)
             # 定時統計監控資料
+            print('self.sw_num: ', self.sw_num)
             print('self.entry_num: ', self.entry_num)
             print('self.drop_entry_num: ', 0)
             print('self.port_num: ', self.port_num)
@@ -1025,6 +1029,8 @@ class MLDetection(good_controller):
             print('self.priority: ', self.average_priority)     # feature2 FEP
             print('self.average_hard_timeout: ', self.average_hard_timeout)     # feature3 FET
             print('label: ', 0)
+
+            print('self.spi: ', (self.sfd / self.sw_num))   # ref_feature1 SPI
 
             # self.dataset = self.dataset.append({'packet_time': float(self.packet_time), 'average_priority': self.average_priority,
             #                                     'average_hard_timeout': self.average_hard_timeout,
@@ -1050,6 +1056,7 @@ class MLDetection(good_controller):
         # 每當重新統計時重置entry_num . average_timeout . average_priority
         req = parser.OFPFlowStatsRequest(datapath)
         datapath.send_msg(req)
+        self.sw_num = 0
         self.entry_num = 0
         self.average_hard_timeout = 0
         self.average_priority = 0
@@ -1075,6 +1082,7 @@ class MLDetection(good_controller):
         msg = ev.msg
         body =msg.body
         dpid = ev.msg.datapath.id
+        self.sw_num = self.sw_num + 1
         # print('=============================================')
         # print('|         _flow_stats_reply_handler         |')
         # print('=============================================')
@@ -1137,10 +1145,17 @@ class MLDetection(good_controller):
         body = ev.msg.body
         # print(self.lldp_df)
         degree = pd.DataFrame(self.lldp_df['request_sid'].value_counts())
-        degree.rename(columns={'request_sid': 'degree'}, inplace=True)
-        print(degree.columns.values.tolist())
+        degree.reset_index(inplace=True)
+        degree.rename(columns={'index': 'request_sid', 'request_sid': 'swdegree'}, inplace=True)
+        # degree = degree.append((degree['request_sid'] / degree['swdegree']), ignore_index=True)
+        degree['test'] = degree['request_sid'] / degree['swdegree']
+
+        print(degree['test'].sum())
         print(degree)
-        print('dpid  &  flow counter: ', ev.msg.datapath.id, body.flow_count)
+        print('dpid  &  flow counter  &  swdegree: ', ev.msg.datapath.id, body.flow_count,
+                                                      int(degree[degree.request_sid == int(ev.msg.datapath.id)].swdegree.values))
+
+        self.sfd += (body.flow_count / int(degree[degree.request_sid == int(ev.msg.datapath.id)].swdegree.values)) ** 2
         # self.logger.debug('AggregateStats: packet_count=%d byte_count=%d '
         #                   'flow_count=%d',
         #                   body.packet_count, body.byte_count,
