@@ -992,6 +992,8 @@ class MLDetection(good_controller):
         # self.switches = kwargs['switches']
         # self.ports = kwargs['ports']
         # ref 9 features
+        self.spi = 0
+
 
     @set_ev_cls(ofp_event.EventOFPStateChange, [MAIN_DISPATCHER, DEAD_DISPATCHER])
     def _state_change_handler(self, ev):
@@ -1029,8 +1031,13 @@ class MLDetection(good_controller):
             print('self.priority: ', self.average_priority)     # feature2 FEP
             print('self.average_hard_timeout: ', self.average_hard_timeout)     # feature3 FET
             print('label: ', 0)
-
-            print('self.spi: ', (self.sfd / self.sw_num))   # ref_feature1 SPI
+            if self.sfd == 0 or self.sw_num == 0:
+                self.spi == 0
+            else:
+                self.spi = self.sfd / self.sw_num
+            print('self.spi: ', self.spi)   # ref_feature1 SPI
+            # print('sfd: ', type(self.sfd), self.sfd)
+            # print('sw_num: ', type(self.sw_num), self.sw_num)
 
             # self.dataset = self.dataset.append({'packet_time': float(self.packet_time), 'average_priority': self.average_priority,
             #                                     'average_hard_timeout': self.average_hard_timeout,

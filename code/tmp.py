@@ -61,3 +61,14 @@ dataset.to_csv('time.csv')
 print(dataset)
 # import sklearn
 # print("Sklearn verion is {}".format(sklearn.__version__))
+
+
+
+sfd = float(6.472222222222222)
+sw_num = int(7)
+
+spi = sfd/sw_num
+
+print(spi)
+# sfd:  <class 'float'>
+# sw_num:  <class 'int'> 7
