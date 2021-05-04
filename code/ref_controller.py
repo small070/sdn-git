@@ -54,6 +54,7 @@ class good_controller(app_manager.RyuApp):
         self.packet_in_time = 0
         self.packet_out_time = 0
         self.packet_time = 0
+        self.flowmod_sum = 0
 
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
@@ -92,6 +93,7 @@ class good_controller(app_manager.RyuApp):
         msg.datapath.send_msg(req)
 
     def add_flow(self, datapath, priority, match, actions):
+        self.flowmod_sum += 1
         ofp = datapath.ofproto
         parser = datapath.ofproto_parser
 
@@ -971,7 +973,11 @@ class MLDetection(good_controller):
             self.packet_out = 0
             self.packet_time = 0
             self.sw_num = 0
+            self.spi = 0
+            self.adn = 0
             self.sfd = 0
+            self.sw_degree_sum = 0
+            self.pfsi = 0
             hub.sleep(5)
 
     def __init__(self, *args, **kwargs):
@@ -993,6 +999,12 @@ class MLDetection(good_controller):
         # self.ports = kwargs['ports']
         # ref 9 features
         self.spi = 0
+        self.adn = 0
+        self.sw_degree_sum = 0
+        self.priority_sum = 0
+        self.pfsi = 0
+        self.hard_timeout_sum = 0
+        self.tfsi = 0
 
 
     @set_ev_cls(ofp_event.EventOFPStateChange, [MAIN_DISPATCHER, DEAD_DISPATCHER])
@@ -1028,16 +1040,36 @@ class MLDetection(good_controller):
                 packet_ratio = (self.packet_out / self.packet_in)
             print('self.packet_ratio: ', packet_ratio)  # feature5 PPT
             print('self.packet_time: ', self.packet_time)   # feature1 APFT
-            print('self.priority: ', self.average_priority)     # feature2 FEP
+            print('self.priority: ', self.average_priority)     # feature2 FEP # Haven't averaged yet
             print('self.average_hard_timeout: ', self.average_hard_timeout)     # feature3 FET
             print('label: ', 0)
+
+
             if self.sfd == 0 or self.sw_num == 0:
                 self.spi == 0
             else:
                 self.spi = self.sfd / self.sw_num
             print('self.spi: ', self.spi)   # ref_feature1 SPI
-            # print('sfd: ', type(self.sfd), self.sfd)
-            # print('sw_num: ', type(self.sw_num), self.sw_num)
+
+            if self.sw_degree_sum == 0 or self.sw_num == 0:
+                self.adn == 0
+            else:
+                self.adn = self.sw_degree_sum / self.sw_num
+            print('ADN: ', self.adn)   # ref_feature2 ADN
+
+            if self.priority_sum == 0 or self.flowmod_sum == 0:
+                self.pfsi = 0
+            else:
+                self.pfsi = self.priority_sum / self.flowmod_sum
+            print('PFSI: ', self.pfsi)
+            print('priority_sum: ', self.priority_sum)
+            print('flowmod_sum: ', self.flowmod_sum)
+
+            if self.hard_timeout_sum == 0 or self.flowmod_sum == 0:
+                self.tfsi = 0
+            else:
+                self.tfsi = self.hard_timeout_sum / self.flowmod_sum
+            print('TFSI: ', self.tfsi)
 
             # self.dataset = self.dataset.append({'packet_time': float(self.packet_time), 'average_priority': self.average_priority,
             #                                     'average_hard_timeout': self.average_hard_timeout,
@@ -1067,6 +1099,8 @@ class MLDetection(good_controller):
         self.entry_num = 0
         self.average_hard_timeout = 0
         self.average_priority = 0
+        self.priority_sum = 0
+        self.hard_timeout_sum = 0
 
         # 發送Port狀態請求
         # 每當重新統計時重置port_num
@@ -1097,8 +1131,10 @@ class MLDetection(good_controller):
 
         for stat in body:
             self.entry_num = self.entry_num + 1
-            self.average_priority = self.average_priority + stat.priority
+            self.average_priority = self.average_priority + stat.priority   # Haven't averaged yet
+            self.priority_sum = self.priority_sum + stat.priority
             self.average_hard_timeout = self.average_hard_timeout + stat.hard_timeout
+            self.hard_timeout_sum = self.hard_timeout_sum + stat.hard_timeout
             self.flags = stat.flags
             # print('drop flow entry: ', self.flags)
 
@@ -1156,6 +1192,7 @@ class MLDetection(good_controller):
         degree.rename(columns={'index': 'request_sid', 'request_sid': 'swdegree'}, inplace=True)
         # degree = degree.append((degree['request_sid'] / degree['swdegree']), ignore_index=True)
         degree['test'] = degree['request_sid'] / degree['swdegree']
+        self.sw_degree_sum = degree['swdegree'].sum()
 
         print(degree['test'].sum())
         print(degree)
