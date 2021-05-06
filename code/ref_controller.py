@@ -772,9 +772,15 @@ class good_controller(app_manager.RyuApp):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
-        if pkt_ipv4 is None:
+        # if pkt_ipv4 is None:
+        #     print("D----------N----------S")
+        # else:
+        #     dst_index = self.host_df[self.host_df.ip == pkt_ipv4.dst].index.values
+
+        while pkt_ipv4 is None:
             print("D----------N----------S")
-        else:
+            return
+        if pkt_ipv4 is not None:
             dst_index = self.host_df[self.host_df.ip == pkt_ipv4.dst].index.values
 
         # print('pkt_ipv4.dst: ', pkt_ipv4.dst)
