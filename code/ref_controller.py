@@ -1034,7 +1034,7 @@ class MLDetection(good_controller):
             print('self.port_num: ', self.port_num)
             print('self.packet_in: ', self.packet_in)
             print('self.packet_out: ', self.packet_out)
-            if self.packet_in == 0:
+            if self.packet_in == 0 or self.packet_out == 0:
                 packet_ratio = 0
             else:
                 packet_ratio = (self.packet_out / self.packet_in)
@@ -1061,7 +1061,7 @@ class MLDetection(good_controller):
                 self.pfsi = 0
             else:
                 self.pfsi = self.priority_sum / self.flowmod_sum
-            print('PFSI: ', self.pfsi)
+            print('PFSI: ', self.pfsi)   # ref_feature4 PFSI
             print('priority_sum: ', self.priority_sum)
             print('flowmod_sum: ', self.flowmod_sum)
 
@@ -1069,7 +1069,22 @@ class MLDetection(good_controller):
                 self.tfsi = 0
             else:
                 self.tfsi = self.hard_timeout_sum / self.flowmod_sum
-            print('TFSI: ', self.tfsi)
+            print('TFSI: ', self.tfsi)   # ref_feature5 TFSI
+
+            print('self.sw_num: ', self.sw_num)   # ref_feature7 Ns
+
+            if self.packet_in == 0 or self.packet_out == 0:
+                ppr = 0
+            else:
+                ppr = (self.packet_in / self.packet_out)
+            print('PPR: ', ppr)     # ref_feature8 PPR
+
+            if self.packet_in == 0 or self.packet_out == 0:
+                ppd = 0
+            else:
+                ppd = ((self.packet_out - self.packet_in) / self.packet_out)
+            print('PPD: ', ppd)     # ref_feature9 PPR
+
 
             # self.dataset = self.dataset.append({'packet_time': float(self.packet_time), 'average_priority': self.average_priority,
             #                                     'average_hard_timeout': self.average_hard_timeout,
