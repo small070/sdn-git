@@ -55,7 +55,7 @@ class good_controller(app_manager.RyuApp):
         self.packet_out_time = 0
         self.packet_time = 0
         self.flowmod_sum = 0
-
+        self.flow_sum = 0
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
@@ -565,7 +565,7 @@ class good_controller(app_manager.RyuApp):
                         # print('request sid & port: ', path[-i - 1], '&', request_port)
                         # print('receive sid & port: ', path[-i - 2], '&', receive_port)
                         # print('tmp_port: ', tmp_receive_port)
-
+            self.flow_sum += 1
 
 
         # print('df: ', self.df)
@@ -1057,11 +1057,13 @@ class MLDetection(good_controller):
                 self.spi = self.sfd / self.sw_num
             print('self.spi: ', self.spi)   # ref_feature1 SPI
 
+            print('self_flow_sum: ', self.flow_sum)     # ref_feature AFSF
+
             if self.sw_degree_sum == 0 or self.sw_num == 0:
                 self.adn == 0
             else:
                 self.adn = self.sw_degree_sum / self.sw_num
-            print('ADN: ', self.adn)   # ref_feature2 ADN
+            print('ADN: ', self.adn)   # ref_feature3 ADN
 
             if self.priority_sum == 0 or self.flowmod_sum == 0:
                 self.pfsi = 0

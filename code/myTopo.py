@@ -24,7 +24,7 @@ class MyTopo(Topo):
 
         # Add host
         for i in range(0, self.num_host, 1):
-            self.host.append(self.addHost('h'+str(i)))
+            self.host.append(self.addHost('h'+str(i+1)))
         print('Adding Hosts...')
         print(self.host)
 
@@ -34,7 +34,7 @@ class MyTopo(Topo):
 
         # Add switch
         for i in range(0, self.num_sw, 1):
-            self.switch.append(self.addSwitch('s'+str(i)))
+            self.switch.append(self.addSwitch('s'+str(i+1)))
         print('Adding Switches...')
         print(self.switch)
 
