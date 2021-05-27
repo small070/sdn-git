@@ -39,23 +39,23 @@ pd.set_option('max_colwidth', 100)
 class good_controller(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
-    df = pd.DataFrame(columns=['switch_id', 'live_port', 'hw_addr'])
-    lldp_df = pd.DataFrame(columns=['request_sid', 'request_port', 'receive_sid', 'receive_port'])
-    host_df = pd.DataFrame()
-    path_df = pd.DataFrame()
+
 
 
     def __init__(self, *args, **kwargs):
         super(good_controller, self).__init__(*args, **kwargs)
         self.net = nx.DiGraph()
-
+        self.df = pd.DataFrame(columns=['switch_id', 'live_port', 'hw_addr'])
+        self.lldp_df = pd.DataFrame(columns=['request_sid', 'request_port', 'receive_sid', 'receive_port'])
+        self.host_df = pd.DataFrame()
+        self.path_df = pd.DataFrame()
+        self.flow_df = pd.DataFrame(columns=['pkt_ipv4.src', 'pkt_ipv4.dst', 'port', 'request_port', 'sw_sum'])
         self.packet_in = 0
         self.packet_out = 0
         self.packet_in_time = 0
         self.packet_out_time = 0
         self.packet_time = 0
         self.flowmod_sum = 0
-        self.flow_sum = 0
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
@@ -306,7 +306,7 @@ class good_controller(app_manager.RyuApp):
 
         pkt_udp = pkt.get_protocol(udp.udp)
         if pkt_udp:
-            print('Packet_in UDP')
+            # print('Packet_in UDP')
             self.handle_udp(datapath, in_port, pkt, pkt_ethernet, pkt_ipv4, pkt_udp, src_mac, dst_mac)
 
 
@@ -382,7 +382,7 @@ class good_controller(app_manager.RyuApp):
         # print('handle_icmp datapath_id: ', datapath.id)
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
-
+        count = 0
         dst_index = self.host_df[self.host_df.ip == pkt_ipv4.dst].index.values
         # print('pkt_ipv4.dst: ', pkt_ipv4.dst)
         # print('dst_index: ', dst_index)
@@ -392,8 +392,8 @@ class good_controller(app_manager.RyuApp):
             return
         dst_sid = self.host_df.at[int(dst_index), 'switch_id']
         dst_sid_port = self.host_df.at[int(dst_index), 'live_port']
-        print('icmp_datapath_id: ', datapath.id)
-        print('icmp_dst_sid: ', dst_sid)
+        # print('icmp_datapath_id: ', datapath.id)
+        # print('icmp_dst_sid: ', dst_sid)
 
 
         if pkt_icmp.type == icmp.ICMP_ECHO_REQUEST:
@@ -480,6 +480,7 @@ class good_controller(app_manager.RyuApp):
                     # print('request sid & port: ', path[-i-1], '&', request_port)
                     # print('receive sid & port: ', path[-i-2], '&', receive_port)
 
+
                     # handle first sw
                     if i == 0:
                         test_index = self.df[(self.df.switch_id == int(datapath.id)) &
@@ -512,6 +513,10 @@ class good_controller(app_manager.RyuApp):
                         # print('...')
                         # print('..')
                         # print('.')
+                        count+=1
+                        self.flow_df = self.flow_df.append({'pkt_ipv4.src': pkt_ipv4.src, 'pkt_ipv4.dst': pkt_ipv4.dst,
+                                                      'port': port, 'request_port': request_port, 'sw_sum': count},
+                                                      ignore_index=True)
 
                     # handle mid sw
                     elif i != 0:
@@ -539,7 +544,10 @@ class good_controller(app_manager.RyuApp):
                         # print('receive sid & port: ', path[-i - 2], '&', receive_port)
                         # print('tmp_port: ', tmp_receive_port)
                         tmp_receive_port = receive_port
-
+                        count+=1
+                        self.flow_df = self.flow_df.append({'pkt_ipv4.src': pkt_ipv4.src, 'pkt_ipv4.dst': pkt_ipv4.dst,
+                                                      'port': port, 'request_port': request_port, 'sw_sum': count},
+                                                      ignore_index=True)
                     # handle end sw
                     elif (i == (len(path)-2)):
                         test_index = self.df[(self.df.switch_id == int(path[-i - 2])) &
@@ -565,7 +573,10 @@ class good_controller(app_manager.RyuApp):
                         # print('request sid & port: ', path[-i - 1], '&', request_port)
                         # print('receive sid & port: ', path[-i - 2], '&', receive_port)
                         # print('tmp_port: ', tmp_receive_port)
-            self.flow_sum += 1
+                        count+=1
+                        self.flow_df = self.flow_df.append({'pkt_ipv4.src': pkt_ipv4.src, 'pkt_ipv4.dst': pkt_ipv4.dst,
+                                                      'port': port, 'request_port': request_port, 'sw_sum': count},
+                                                      ignore_index=True)
 
 
         # print('df: ', self.df)
@@ -593,10 +604,29 @@ class good_controller(app_manager.RyuApp):
             dst_dp = self.host_df.at[int(dst_index), 'datapath']
             self.send_packet(dst_dp, dst_sid_port, 0, pkt)
 
-            print('=============================================')
-            print('|              ICMP Request                 |')
-            print('=============================================')
-            print('send ICMP Request packets to switch= ', dst_dp.id, ' port= ', dst_sid_port)
+            # print('=============================================')
+            # print('|              ICMP Request                 |')
+            # print('=============================================')
+            # print('send ICMP Request packets to switch= ', dst_dp.id, ' port= ', dst_sid_port)
+            # # print('datapath.id: ', datapath.id)
+            # # print('src_mac: ', src_mac)
+            # # print('dst_mac: ', dst_mac)
+            # # # print('pkt_ipv4: ', pkt_ipv4)
+            # # print('pkt_ipv4.src_ip', pkt_ipv4.src)
+            # # print('pkt_ipv4.dst_ip', pkt_ipv4.dst)
+            # # print('port: ', port)
+            # # print('host_df switch_id: ', dst_sid)
+            # # print('host_df live_port: ', dst_sid_port)
+            # # print('path: ', path)
+            # # print('path length: ', len(path))
+            # print('...')
+            # print('..')
+            # print('.')
+
+        elif pkt_tcp.type == icmp.ICMP_ECHO_REPLY:
+            # print('=============================================')
+            # print('|               ICMP Reply                  |')
+            # print('=============================================')
             # print('datapath.id: ', datapath.id)
             # print('src_mac: ', src_mac)
             # print('dst_mac: ', dst_mac)
@@ -604,32 +634,13 @@ class good_controller(app_manager.RyuApp):
             # print('pkt_ipv4.src_ip', pkt_ipv4.src)
             # print('pkt_ipv4.dst_ip', pkt_ipv4.dst)
             # print('port: ', port)
-            # print('host_df switch_id: ', dst_sid)
-            # print('host_df live_port: ', dst_sid_port)
-            # print('path: ', path)
-            # print('path length: ', len(path))
-            print('...')
-            print('..')
-            print('.')
-
-        elif pkt_tcp.type == icmp.ICMP_ECHO_REPLY:
-            print('=============================================')
-            print('|               ICMP Reply                  |')
-            print('=============================================')
-            print('datapath.id: ', datapath.id)
-            print('src_mac: ', src_mac)
-            print('dst_mac: ', dst_mac)
-            # print('pkt_ipv4: ', pkt_ipv4)
-            print('pkt_ipv4.src_ip', pkt_ipv4.src)
-            print('pkt_ipv4.dst_ip', pkt_ipv4.dst)
-            print('port: ', port)
-            print('dst_sid: ', dst_sid) # host_df switch_id
-            print('dst_sid_port: ', dst_sid_port) # host_df live_port
-            # print('path: ', path)
-            # print('path length: ', len(path))
-            print('...')
-            print('..')
-            print('.')
+            # print('dst_sid: ', dst_sid) # host_df switch_id
+            # print('dst_sid_port: ', dst_sid_port) # host_df live_port
+            # # print('path: ', path)
+            # # print('path length: ', len(path))
+            # print('...')
+            # print('..')
+            # print('.')
 
 
 
@@ -692,18 +703,18 @@ class good_controller(app_manager.RyuApp):
 
                         tmp_receive_port = receive_port
 
-                        print('=============================================')
-                        print('|             ADD Flow Entry                |')
-                        print('=============================================')
-                        print('start sw')
-                        print('request sid & port: ', path[-i - 1], '&', request_port)
-                        print('receive sid & port: ', path[-i - 2], '&', receive_port)
-                        print('test_datapath.id: ', test_datapath.id)
-                        print('in_port: ', port)
-                        print('out_port: ', request_port)
-                        print('...')
-                        print('..')
-                        print('.')
+                        # print('=============================================')
+                        # print('|             ADD Flow Entry                |')
+                        # print('=============================================')
+                        # print('start sw')
+                        # print('request sid & port: ', path[-i - 1], '&', request_port)
+                        # print('receive sid & port: ', path[-i - 2], '&', receive_port)
+                        # print('test_datapath.id: ', test_datapath.id)
+                        # print('in_port: ', port)
+                        # print('out_port: ', request_port)
+                        # print('...')
+                        # print('..')
+                        # print('.')
 
                     # handle mid sw
                     elif i != 0:
@@ -723,14 +734,14 @@ class good_controller(app_manager.RyuApp):
                         actions = [parser.OFPActionOutput(tmp_receive_port)]
                         self.add_flow(test_datapath1, 1, match, actions)
 
-                        print('=============================================')
-                        print('|             ADD Flow Entry                |')
-                        print('=============================================')
-                        print('mid sw')
-                        print('request sid & port: ', path[-i - 1], '&', request_port)
-                        print('receive sid & port: ', path[-i - 2], '&', receive_port)
-                        print('tmp_port: ', tmp_receive_port)
-                        tmp_receive_port = receive_port
+                        # print('=============================================')
+                        # print('|             ADD Flow Entry                |')
+                        # print('=============================================')
+                        # print('mid sw')
+                        # print('request sid & port: ', path[-i - 1], '&', request_port)
+                        # print('receive sid & port: ', path[-i - 2], '&', receive_port)
+                        # print('tmp_port: ', tmp_receive_port)
+                        # tmp_receive_port = receive_port
 
                     # handle end sw
                     elif (i == len(path) - 2):
@@ -750,19 +761,19 @@ class good_controller(app_manager.RyuApp):
                         actions = [parser.OFPActionOutput(request_port)]
                         self.add_flow(test_datapath1, 1, match, actions)
 
-                        print('=============================================')
-                        print('|             ADD Flow Entry                |')
-                        print('=============================================')
-                        print('end sw')
-                        print('request sid & port: ', path[-i - 1], '&', request_port)
-                        print('receive sid & port: ', path[-i - 2], '&', receive_port)
-                        print('tmp_port: ', tmp_receive_port)
+                        # print('=============================================')
+                        # print('|             ADD Flow Entry                |')
+                        # print('=============================================')
+                        # print('end sw')
+                        # print('request sid & port: ', path[-i - 1], '&', request_port)
+                        # print('receive sid & port: ', path[-i - 2], '&', receive_port)
+                        # print('tmp_port: ', tmp_receive_port)
 
 
 
         # print('df: ', self.df)
         # print('host_df: ', self.host_df)
-        print('path_df: ', self.path_df)
+        # print('path_df: ', self.path_df)
         # print('lldp_df: ', self.lldp_df)
         # print('shortest path: ', nx.dijkstra_path(self.net, 1, 3))
 
@@ -772,13 +783,8 @@ class good_controller(app_manager.RyuApp):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
-        # if pkt_ipv4 is None:
-        #     print("D----------N----------S")
-        # else:
-        #     dst_index = self.host_df[self.host_df.ip == pkt_ipv4.dst].index.values
-
         while pkt_ipv4 is None:
-            print("D----------N----------S")
+            # print("D----------N----------S")
             return
         if pkt_ipv4 is not None:
             dst_index = self.host_df[self.host_df.ip == pkt_ipv4.dst].index.values
@@ -1034,6 +1040,7 @@ class MLDetection(good_controller):
 
             hub.sleep(5)
             # 定時統計監控資料
+            print('-----------------------------------------')
             print('self.sw_num: ', self.sw_num)
             print('self.entry_num: ', self.entry_num)
             print('self.drop_entry_num: ', 0)
@@ -1044,11 +1051,11 @@ class MLDetection(good_controller):
                 packet_ratio = 0
             else:
                 packet_ratio = (self.packet_out / self.packet_in)
-            print('self.packet_ratio: ', packet_ratio)  # feature5 PPT
-            print('self.packet_time: ', self.packet_time)   # feature1 APFT
-            print('self.priority: ', self.average_priority)     # feature2 FEP # Haven't averaged yet
-            print('self.average_hard_timeout: ', self.average_hard_timeout)     # feature3 FET
-            print('label: ', 0)
+            # print('self.packet_ratio: ', packet_ratio)  # feature5 PPT
+            # print('self.packet_time: ', self.packet_time)   # feature1 APFT
+            # print('self.priority: ', self.average_priority)     # feature2 FEP # Haven't averaged yet
+            # print('self.average_hard_timeout: ', self.average_hard_timeout)     # feature3 FET
+            # print('label: ', 0)
 
 
             if self.sfd == 0 or self.sw_num == 0:
@@ -1057,7 +1064,7 @@ class MLDetection(good_controller):
                 self.spi = self.sfd / self.sw_num
             print('self.spi: ', self.spi)   # ref_feature1 SPI
 
-            print('self_flow_sum: ', self.flow_sum)     # ref_feature AFSF
+            print('self_flow_df: \n', self.flow_df)   # ref_feature AFSF
 
             if self.sw_degree_sum == 0 or self.sw_num == 0:
                 self.adn == 0
@@ -1217,10 +1224,10 @@ class MLDetection(good_controller):
         degree['test'] = degree['request_sid'] / degree['swdegree']
         self.sw_degree_sum = degree['swdegree'].sum()
 
-        print(degree['test'].sum())
-        print(degree)
-        print('dpid  &  flow counter  &  swdegree: ', ev.msg.datapath.id, body.flow_count,
-                                                      int(degree[degree.request_sid == int(ev.msg.datapath.id)].swdegree.values))
+        # print(degree['test'].sum())
+        # print(degree)
+        # print('dpid  &  flow counter  &  swdegree: ', ev.msg.datapath.id, body.flow_count,
+        #                                               int(degree[degree.request_sid == int(ev.msg.datapath.id)].swdegree.values))
 
         self.sfd += (body.flow_count / int(degree[degree.request_sid == int(ev.msg.datapath.id)].swdegree.values)) ** 2
         # self.logger.debug('AggregateStats: packet_count=%d byte_count=%d '
