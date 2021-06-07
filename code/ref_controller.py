@@ -50,6 +50,7 @@ class good_controller(app_manager.RyuApp):
         self.host_df = pd.DataFrame()
         self.path_df = pd.DataFrame()
         self.flow_df = pd.DataFrame(columns=['pkt_ipv4.src', 'pkt_ipv4.dst', 'port', 'request_port', 'sw_sum'])
+        self.tmp_flow_df = pd.DataFrame()
         self.packet_in = 0
         self.packet_out = 0
         self.packet_in_time = 0
@@ -645,8 +646,8 @@ class good_controller(app_manager.RyuApp):
 
 
             dst_dp = self.host_df.at[int(dst_index), 'datapath']
-            print('dst_dp.id: ', dst_dp.id)
-            print('dst_sid_port:', dst_sid_port)
+            # print('dst_dp.id: ', dst_dp.id)
+            # print('dst_sid_port:', dst_sid_port)
             self.send_packet(dst_dp, dst_sid_port, 0, pkt)
 
             links_index = self.path_df[
@@ -800,10 +801,10 @@ class good_controller(app_manager.RyuApp):
         dst_sid_port = self.host_df.at[int(dst_index), 'live_port']
 
         links_index = self.path_df[((self.path_df.start_sid == int(datapath.id)) & (self.path_df.end_sid == int(dst_sid)))].index.values
-        print('path_df: \n', self.path_df)
-        print('datapath_id: ', datapath.id)
-        print('dst_sid', dst_sid)
-        print('first links_index: ', links_index)
+        # print('path_df: \n', self.path_df)
+        # print('datapath_id: ', datapath.id)
+        # print('dst_sid', dst_sid)
+        # print('first links_index: ', links_index)
 
         if links_index.size == 0:
             links_index = self.path_df[((self.path_df.start_sid == int(dst_sid)) & (self.path_df.end_sid == int(datapath.id)))].index.values
@@ -998,14 +999,22 @@ class MLDetection(good_controller):
         self.monitor_thread = hub.spawn(self._monitor)
         self.task_thread = hub.spawn(self._reset_packet_inout)
 
-        self.sw_num = 0
+        self.sw_num = 0     
         self.entry_num = 0
         self.port_num = 0
+        self.drop_num = 0
         self.average_hard_timeout = 0
         self.average_priority = 0
         self.dataset = pd.DataFrame(columns=['packet_time', 'average_priority',
                                              'average_hard_timeout', 'packet_ratio', 'label'])
         self.sw_entry = pd.DataFrame(columns=['switch_id', 'entry_num'])
+
+        self.apft = 0   # feature1 APFT
+        self.fep = 0   # feature2 FEP
+        self.fet = 0   # feature3 FET
+        self.adft = 0   # feature4 ADFT
+        self.ppt = 0   # feature5 PPT
+
 
         # self.switches = kwargs['switches']
         # self.ports = kwargs['ports']
@@ -1013,10 +1022,12 @@ class MLDetection(good_controller):
         self.spi = 0
         self.adn = 0
         self.sw_degree_sum = 0
-        self.priority_sum = 0
-        self.pfsi = 0
+        self.priority_sum = 0 
+        self.afsf = 0
+        self.pfsi = 0 
         self.hard_timeout_sum = 0
         self.tfsi = 0
+        self.vda = 0
 
 
     @set_ev_cls(ofp_event.EventOFPStateChange, [MAIN_DISPATCHER, DEAD_DISPATCHER])
@@ -1041,64 +1052,124 @@ class MLDetection(good_controller):
             hub.sleep(5)
             # 定時統計監控資料
             print('-----------------------------------------')
-            print('self.sw_num: ', self.sw_num)
-            print('self.entry_num: ', self.entry_num)
-            print('self.drop_entry_num: ', 0)
-            print('self.port_num: ', self.port_num)
-            print('self.packet_in: ', self.packet_in)
-            print('self.packet_out: ', self.packet_out)
+            # print('self.sw_num: ', self.sw_num)
+            # print('self.entry_num: ', self.entry_num)
+            # print('self.drop_entry_num: ', 0)
+            # print('self.port_num: ', self.port_num)
+            # print('self.packet_in: ', self.packet_in)
+            # print('self.packet_out: ', self.packet_out)
+            # print('self.packet_ratio: ', packet_ratio)          
+            # print('self.priority: ', self.average_priority)
+            # print('self.average_hard_timeout: ', self.average_hard_timeout)
+            # print('label: ', 0)
+            
+
+            # feature1 APFT
+            if self.packet_time == 0:
+                self.apft = 0
+            else:
+                self.apft = self.packet_time
+
+            # feature2 FEP
+            if self.average_priority == 0 or self.entry_num == 0:
+                self.fep = 0
+            else:
+                self.fep = (self.average_priority / self.entry_num)
+
+            # feature3 FET
+            if self.average_hard_timeout == 0 or self.entry_num == 0:
+                self.fet = 0
+            else:
+                self.fet = (self.average_hard_timeout / self.entry_num)
+
+            # feature4 ADFT
+            if self.drop_num == 0 or self.entry_num == 0:
+                self.adft = 0
+            else:
+                self.adft = (self.drop_num / self.entry_num)
+
+            # feature5 PPT
             if self.packet_in == 0 or self.packet_out == 0:
                 packet_ratio = 0
+                self.ppt = packet_ratio
             else:
                 packet_ratio = (self.packet_out / self.packet_in)
-            # print('self.packet_ratio: ', packet_ratio)  # feature5 PPT
-            # print('self.packet_time: ', self.packet_time)   # feature1 APFT
-            # print('self.priority: ', self.average_priority)     # feature2 FEP # Haven't averaged yet
-            # print('self.average_hard_timeout: ', self.average_hard_timeout)     # feature3 FET
-            # print('label: ', 0)
+                self.ppt = packet_ratio
 
 
+            print('feature1 APFT: ', self.apft)   # feature1 APFT
+            print('feature2 FEP: ', self.fep)   # feature2 FEP
+            print('feature3 FET: ', self.fet)   # feature3 FET
+            print('feature4 ADFT: ', self.adft)   # feature4 ADFT
+            print('feature5 PPT: ', self.ppt)   # feature5 PPT
+
+
+            
+            # ref_feature1 SPI
             if self.sfd == 0 or self.sw_num == 0:
                 self.spi == 0
             else:
                 self.spi = self.sfd / self.sw_num
-            print('self.spi: ', self.spi)   # ref_feature1 SPI
+            
+            self.tmp_flow_df = self.flow_df['pkt_ipv4.src'].value_counts().reset_index()
+            self.tmp_flow_df.columns = ['pkt_ipv4.src','sw_num']
+            flow_sw_sum = self.tmp_flow_df['sw_num'].sum()
+            flow_sum = self.tmp_flow_df.shape[1] #  總列數
 
-            print('self_flow_df: \n', self.flow_df)   # ref_feature AFSF
+            # ref_feature2 AFSF
+            if flow_sw_sum == 0 or flow_sum == 0 or self.sw_num == 0:
+                self.afsf == 0
+            else:
+                self.afsf = flow_sw_sum / (flow_sum * self.sw_num)
 
+            # ref_feature3 ADN
             if self.sw_degree_sum == 0 or self.sw_num == 0:
                 self.adn == 0
             else:
                 self.adn = self.sw_degree_sum / self.sw_num
-            print('ADN: ', self.adn)   # ref_feature3 ADN
 
+            # ref_feature4 PFSI
             if self.priority_sum == 0 or self.flowmod_sum == 0:
                 self.pfsi = 0
             else:
                 self.pfsi = self.priority_sum / self.flowmod_sum
-            print('PFSI: ', self.pfsi)   # ref_feature4 PFSI
-            print('priority_sum: ', self.priority_sum)
-            print('flowmod_sum: ', self.flowmod_sum)
 
+            # ref_feature5 TFSI
             if self.hard_timeout_sum == 0 or self.flowmod_sum == 0:
                 self.tfsi = 0
             else:
                 self.tfsi = self.hard_timeout_sum / self.flowmod_sum
-            print('TFSI: ', self.tfsi)   # ref_feature5 TFSI
 
-            print('self.sw_num: ', self.sw_num)   # ref_feature7 Ns
+            # ref_feature6 VDA
+            if self.vda == 0 :
+                self.vda = 0
+            else:
+                self.vda = 0
 
+            # ref_feature7 Ns
+
+            # ref_feature8 PPR
             if self.packet_in == 0 or self.packet_out == 0:
                 ppr = 0
             else:
                 ppr = (self.packet_in / self.packet_out)
-            print('PPR: ', ppr)     # ref_feature8 PPR
 
+            # ref_feature9 PPR
             if self.packet_in == 0 or self.packet_out == 0:
                 ppd = 0
             else:
                 ppd = ((self.packet_out - self.packet_in) / self.packet_out)
-            print('PPD: ', ppd)     # ref_feature9 PPR
+
+
+            print('ref_feature1 SPI: ', self.spi)
+            print('ref_feature2 AFSF: ', self.afsf)
+            print('ref_feature3 ADN: ', self.adn)
+            print('ref_feature4 PFSI: ', self.pfsi)
+            print('ref_feature5 TFSI: ', self.tfsi)
+            print('ref_feature6 VDA: ', self.vda)
+            print('ref_feature7 Ns: ', self.sw_num)
+            print('ref_feature8 PPR: ', ppr)
+            print('ref_feature9 PPD: ', ppd)
 
 
             # self.dataset = self.dataset.append({'packet_time': float(self.packet_time), 'average_priority': self.average_priority,
