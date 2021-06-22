@@ -73,9 +73,60 @@
 # # sfd:  <class 'float'>
 # # sw_num:  <class 'int'> 7
 
-import vaex
+# import vaex
+#
+#
+# df = vaex.open('123.csv')
+#
+# print(df)
 
 
-df = vaex.open('123.csv')
+import random
+from scipy.special import comb, perm
+import numpy as np
 
-print(df)
+dict = np.array([])
+switch = 30
+
+edges = perm((switch - 2), 2)
+delta = random.uniform(0.1, 0.9)
+k = delta * edges
+
+
+for i in range(0, switch, 1):
+    if i != (switch - 1):
+        print(i, i + 1)     # link S1 - Sn
+    dict = np.append(dict, [i, 0])
+
+print('\n')
+print('k: ', k)
+print('\n')
+
+for key, value in dict:
+    st_end_link = random.randint(0, 3)
+    mid_link = random.randint(0, 2)
+    # print(key, value)
+
+    if k >= 0:
+        if key == 0:
+            k = k-st_end_link
+            dict[key] = dict[key]+st_end_link
+            print('first: ', k, value, st_end_link)
+
+        elif key == (switch-1):
+            k = k-mid_link
+            dict[key] = dict[key] + st_end_link
+            print('end: ', k, value)
+
+        elif (value+mid_link) <= 2:
+            k = k-st_end_link
+            dict[key] = dict[key] + mid_link
+            print('middle: ', k, value)
+
+print('k: ', k)
+print(dict.values())
+
+# print('keys: ', len(dict.keys()))
+# print('k: ', '%.3f' % k)
+# print('dict: ', dict)
+
