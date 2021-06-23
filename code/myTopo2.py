@@ -42,6 +42,7 @@ class MyTopo(Topo):
             self.switch.append(self.addSwitch('s' + str(i + 1)))
             self.arr = np.append(self.arr, ['s' + str(i + 1), 0])
         self.arr2 = np.array(self.arr).reshape(len(self.switch), 2)
+
         print('Adding Switches...')
         # print(self.switch)
         # print(self.arr)
@@ -52,7 +53,8 @@ class MyTopo(Topo):
 
         # Add lines
         # host to switch
-
+        for i in range(0, len(self.switch), 1):
+            self.addLink(self.host[i], self.switch[i])
         # self.addLink(self.host[0], self.switch[0])
         # self.addLink(self.host[1], self.switch[2])
         # self.addLink(self.host[2], self.switch[2])
@@ -86,33 +88,41 @@ class MyTopo(Topo):
                 # print('self.arr2[-1][0]: ', self.arr2[-1][0])
 
                 if str(i[0]) == str(self.arr2[0][0]):
-
                     for link in range(1, st_end_link+1, 1):
-                        if int(i[1]) > 4:
+                        if int(i[1]) >= 4:
                             break
-                        sw = random.randint(1, len(self.switch))
-                        self.addLink(self.switch[0], self.switch[sw])
+                        sw = random.randint(2, len(self.switch))
+                        self.addLink(self.switch[0], self.switch[sw-1])
                         k = k - 1
                         i[1] = int(i[1]) + 1
-                    print('first: ', i)
+                        self.arr2[(sw - 1)][1] = int(self.arr2[(sw - 1)][1]) + 1
+                    print('first: ', self.arr2)
 
                 elif (str(i[0]) != str(self.arr2[0][0])) & (str(i[0]) != str(self.arr2[-1][0])):
 
                     for link in range(1, mid_link+1, 1):
-                        if int(i[1]) > 4:
+                        if int(i[1]) >= 4:
                             break
-                        k = k - mid_link
+                        sw = random.randint(3, len(self.switch))
+                        sw_num = ''.join([x for x in str(i[0]) if x.isdigit()])
+                        print('sw, sw_num: ', sw, sw_num)
+                        if (int(sw) == int(sw_num)) | (int(sw) == (int(sw_num)+1)) | (int(sw) == (int(sw_num)-1)):
+                            break
+                        self.addLink(self.switch[int(sw_num)-1], self.switch[sw - 1])
+                        k = k - 1
                         i[1] = int(i[1]) + 1
-                    print('middle: ', i)
+                        self.arr2[(sw - 1)][1] = int(self.arr2[(sw - 1)][1]) + 1
+
+                    print('middle: ', self.arr2)
 
                 elif str(i[0]) == str(self.arr2[-1][0]):
                     k = k - st_end_link
 
                     for link in range(1, st_end_link+1, 1):
-                        if int(i[1]) > 4:
+                        if int(i[1]) >= 4:
                             break
                         i[1] = int(i[1]) + 1
-                    print('end: ', i)
+                    print('end: ', self.arr2)
 
 
 
@@ -151,7 +161,7 @@ class MyTopo(Topo):
 
 
 def creater():
-    test = MyTopo(5, 7)  # host & switch
+    test = MyTopo(7, 7)  # host & switch
     test.create_host()
     test.create_switch()
     test.create_link()
