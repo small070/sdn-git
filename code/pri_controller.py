@@ -1149,8 +1149,8 @@ class MLDetection(good_controller):
 
             self.dataset2 = self.dataset2.append({'SPI': self.spi, 'AFSF': self.afsf, 'ADN': self.adn,
                                                  'PFSI': self.pfsi, 'TFSI': self.tfsi, 'VDA': self.vda,
-                                                 'Ns': self.sw_num, 'PPR': ppr, 'PPR': ppd,
-                                                 'label': '0'}, ignore_index=True)
+                                                 'Ns': self.sw_num, 'PPR': ppr, 'PPD': ppd,
+                                                 'label': '1'}, ignore_index=True)
             self.dataset2.to_csv('ref_pri_test.csv')
 
             # x = pd.DataFrame(self.dataset, columns=['packet_time', 'average_priority', 'average_hard_timeout', 'packet_ratio'])
