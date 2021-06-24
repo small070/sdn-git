@@ -35,12 +35,8 @@ pd.set_option('display.max_rows', None)
 pd.set_option('max_colwidth', 100)
 
 
-
 class good_controller(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
-
-
-
 
     def __init__(self, *args, **kwargs):
         super(good_controller, self).__init__(*args, **kwargs)
@@ -84,8 +80,6 @@ class good_controller(app_manager.RyuApp):
         # print('..')
         # print('.')
 
-
-
     def send_port_stats_request(self, msg):
         ofp = msg.datapath.ofproto
         ofp_parser = msg.datapath.ofproto_parser
@@ -101,7 +95,7 @@ class good_controller(app_manager.RyuApp):
         inst = [parser.OFPInstructionActions(ofp.OFPIT_APPLY_ACTIONS, actions)]
 
         mod = parser.OFPFlowMod(datapath=datapath, priority=priority, command=ofp.OFPFC_ADD,
-                               match=match, instructions=inst, hard_timeout=500)
+                                match=match, instructions=inst, hard_timeout=50)
         datapath.send_msg(mod)
 
     @set_ev_cls(ofp_event.EventOFPPortDescStatsReply, MAIN_DISPATCHER)
@@ -118,7 +112,8 @@ class good_controller(app_manager.RyuApp):
 
             # Append ports(e.g. 1,2,3...) between switch and switch or host
             if stat.port_no < ofproto_v1_3_parser.ofproto.OFPP_MAX:
-                self.df = self.df.append({'datapath': datapath, 'switch_id': datapath.id, 'live_port': stat.port_no, 'hw_addr': stat.hw_addr}, ignore_index=True)
+                self.df = self.df.append({'datapath': datapath, 'switch_id': datapath.id, 'live_port': stat.port_no,
+                                          'hw_addr': stat.hw_addr}, ignore_index=True)
                 self.send_lldp_packet(datapath, stat.port_no, stat.hw_addr)
 
 
@@ -127,15 +122,15 @@ class good_controller(app_manager.RyuApp):
                 # 'at' just use int or float
                 # 'loc' can use int or float or string ......
                 # But 'at' faster to 'loc'
-                self.df = self.df.append({'datapath': datapath, 'switch_id': datapath.id, 'live_port': stat.port_no, 'hw_addr': stat.hw_addr}, ignore_index=True)
+                self.df = self.df.append({'datapath': datapath, 'switch_id': datapath.id, 'live_port': stat.port_no,
+                                          'hw_addr': stat.hw_addr}, ignore_index=True)
 
             # Record switch_id to node
             if not self.net.has_node(datapath.id):
                 # self.net.add_nodes_from(str(datapath.id))    # networkx   ['2', '1', '3']     for list
-                self.net.add_node(datapath.id)    # networkx    [2, 1, 3]   for str
+                self.net.add_node(datapath.id)  # networkx    [2, 1, 3]   for str
                 # self.net.add_node(datapath.id, port=stat.port_no)    # networkx    [2, 1, 3]   for str
                 # print('nodes: ', self.net.nodes)
-
 
         # print('=============================================')
         # print('|         port_stats_reply_handler          |')
@@ -147,7 +142,6 @@ class good_controller(app_manager.RyuApp):
         # print('..')
         # print('.')
 
-
     def send_lldp_packet(self, datapath, live_port, hw_addr):
         # print('send_lldp_packet')
         # print('dpid: ', datapath.id)
@@ -158,7 +152,8 @@ class good_controller(app_manager.RyuApp):
         pkt = packet.Packet()
         pkt.add_protocol(ethernet.ethernet(ethertype=ether_types.ETH_TYPE_LLDP,
                                            src=hw_addr, dst=lldp.LLDP_MAC_NEAREST_BRIDGE))
-        tlv_chassis_id = lldp.ChassisID(subtype=lldp.ChassisID.SUB_LOCALLY_ASSIGNED, chassis_id=str(datapath.id).encode('ascii'))
+        tlv_chassis_id = lldp.ChassisID(subtype=lldp.ChassisID.SUB_LOCALLY_ASSIGNED,
+                                        chassis_id=str(datapath.id).encode('ascii'))
         tlv_live_port = lldp.PortID(subtype=lldp.PortID.SUB_LOCALLY_ASSIGNED, port_id=str(live_port).encode('ascii'))
         tlv_ttl = lldp.TTL(ttl=0)
         tlv_end = lldp.End()
@@ -182,8 +177,7 @@ class good_controller(app_manager.RyuApp):
                                             'request_port': port,
                                             'receive_sid': int(pkt_lldp.tlvs[0].chassis_id),
                                             'receive_port': int(pkt_lldp.tlvs[1].port_id)},
-                                            ignore_index=True)
-
+                                           ignore_index=True)
 
         # Record request_sid, receive_sid, receive_port to edge
         # links = [(datapath.id, int(pkt_lldp.tlvs[0].chassis_id), {'port': int(pkt_lldp.tlvs[1].port_id)})]
@@ -193,16 +187,14 @@ class good_controller(app_manager.RyuApp):
         # print('net nodes: ', self.net.nodes)
         # print('net edges: ', self.net.edges)
 
-
         self.shortest_path(ev)
 
         # if self.net.has_node(1) & self.net.has_node(5):
         #     print(nx.has_path(self.net, 1, 5))
         # if self.net.has_node(1) & self.net.has_node(5):
-            # nx.draw(self.net, with_labels=True)
-            # plt.show()
-            # print(nx.shortest_path(self.net, 1, 5))   # 單個最短路徑
-
+        # nx.draw(self.net, with_labels=True)
+        # plt.show()
+        # print(nx.shortest_path(self.net, 1, 5))   # 單個最短路徑
 
         self.host_df = self.df.copy()
         self.host_df.rename(columns={"hw_addr": "ip"}, inplace=True)
@@ -210,10 +202,9 @@ class good_controller(app_manager.RyuApp):
         arr = []
         for i in range(0, len(self.lldp_df), 1):
             request_index = self.df[(self.df['switch_id'] == self.lldp_df.at[i, 'request_sid']) & (
-                        self.df['live_port'] == self.lldp_df.at[i, 'request_port'])].index.values
+                    self.df['live_port'] == self.lldp_df.at[i, 'request_port'])].index.values
             receive_index = self.df[(self.df['switch_id'] == self.lldp_df.at[i, 'receive_sid']) & (
-                        self.df['live_port'] == self.lldp_df.at[i, 'receive_port'])].index.values
-
+                    self.df['live_port'] == self.lldp_df.at[i, 'receive_port'])].index.values
 
             arr.append(int(request_index))
             arr.append(int(receive_index))
@@ -234,8 +225,6 @@ class good_controller(app_manager.RyuApp):
         # self.host_df.reset_index(drop=True, inplace=True)
         # print("lldp_df:\n", self.lldp_df)
 
-
-
     # https: // blog.csdn.net / xuchenhuics / article / details / 44494249
     def shortest_path(self, ev):
         msg = ev.msg
@@ -247,7 +236,6 @@ class good_controller(app_manager.RyuApp):
         # print('tmp: \n', tmp)
         # print('path_df: \n', path_df)
 
-
         # 轉成上三角矩陣
         m, n = self.path_df.shape
         self.path_df[:] = np.where(np.arange(m)[:, None] >= np.arange(n), np.nan, self.path_df)
@@ -256,8 +244,6 @@ class good_controller(app_manager.RyuApp):
         self.path_df = self.path_df.stack().reset_index()
         self.path_df.columns = ['start_sid', 'end_sid', 'links']
         # print('path_df: \n', self.path_df)
-
-
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def packet_in_handler(self, ev):
@@ -274,13 +260,11 @@ class good_controller(app_manager.RyuApp):
         src_mac = eth.src
         dst_mac = eth.dst
 
-
-
         if not pkt_ethernet:
             # print('Not lldp packets')
             return
 
-        pkt_lldp = pkt.get_protocol(lldp.lldp)      # pkt_test = pkt_ethernet.ethertype == 35020
+        pkt_lldp = pkt.get_protocol(lldp.lldp)  # pkt_test = pkt_ethernet.ethertype == 35020
 
         if pkt_lldp:
             # print('Packet_in LLDP')
@@ -302,14 +286,13 @@ class good_controller(app_manager.RyuApp):
 
         pkt_tcp = pkt.get_protocol(tcp.tcp)
         # if pkt_tcp:
-            # print('Packet_in TCP')
-            # self.handle_tcp(datapath, in_port, pkt, pkt_ethernet, pkt_ipv4, pkt_tcp, src_mac, dst_mac)
+        # print('Packet_in TCP')
+        # self.handle_tcp(datapath, in_port, pkt, pkt_ethernet, pkt_ipv4, pkt_tcp, src_mac, dst_mac)
 
         pkt_udp = pkt.get_protocol(udp.udp)
         if pkt_udp:
             # print('Packet_in UDP')
             self.handle_udp(datapath, in_port, pkt, pkt_ethernet, pkt_ipv4, pkt_udp, src_mac, dst_mac)
-
 
         # print('=============================================')
         # print('|            packet_in_handler              |')
@@ -320,14 +303,16 @@ class good_controller(app_manager.RyuApp):
         # print('..')
         # print('.')
 
-
     def handle_arp(self, datapath, port, pkt_ethernet, pkt_arp, src_mac, dst_mac):
         pkt = packet.Packet()
         parser = datapath.ofproto_parser
 
         if pkt_arp.opcode == arp.ARP_REQUEST:
-            pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype, dst=pkt_ethernet.dst, src=pkt_ethernet.src))
-            pkt.add_protocol(arp.arp(opcode=arp.ARP_REQUEST, src_mac=pkt_arp.src_mac, src_ip=pkt_arp.src_ip, dst_mac=pkt_arp.dst_mac, dst_ip=pkt_arp.dst_ip))
+            pkt.add_protocol(
+                ethernet.ethernet(ethertype=pkt_ethernet.ethertype, dst=pkt_ethernet.dst, src=pkt_ethernet.src))
+            pkt.add_protocol(
+                arp.arp(opcode=arp.ARP_REQUEST, src_mac=pkt_arp.src_mac, src_ip=pkt_arp.src_ip, dst_mac=pkt_arp.dst_mac,
+                        dst_ip=pkt_arp.dst_ip))
 
             for i in range(0, len(self.host_df), 1):
                 self.send_packet(self.host_df.at[i, 'datapath'], self.host_df.at[i, 'live_port'], 0, pkt)
@@ -368,8 +353,11 @@ class good_controller(app_manager.RyuApp):
             # print('.')
 
             # print('host_df', self.host_df)
-            pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype, dst=pkt_ethernet.dst, src=pkt_ethernet.src))
-            pkt.add_protocol(arp.arp(opcode=arp.ARP_REPLY, src_mac=pkt_arp.src_mac, src_ip=pkt_arp.src_ip, dst_mac=pkt_arp.dst_mac, dst_ip=pkt_arp.dst_ip))
+            pkt.add_protocol(
+                ethernet.ethernet(ethertype=pkt_ethernet.ethertype, dst=pkt_ethernet.dst, src=pkt_ethernet.src))
+            pkt.add_protocol(
+                arp.arp(opcode=arp.ARP_REPLY, src_mac=pkt_arp.src_mac, src_ip=pkt_arp.src_ip, dst_mac=pkt_arp.dst_mac,
+                        dst_ip=pkt_arp.dst_ip))
 
             arp_request_index = self.host_df[self.host_df.ip == pkt_arp.dst_ip].index.values
             arp_request_sid = self.host_df.at[int(arp_request_index), 'switch_id']
@@ -395,7 +383,6 @@ class good_controller(app_manager.RyuApp):
         dst_sid_port = self.host_df.at[int(dst_index), 'live_port']
         # print('icmp_datapath_id: ', datapath.id)
         # print('icmp_dst_sid: ', dst_sid)
-
 
         if pkt_icmp.type == icmp.ICMP_ECHO_REQUEST:
             dst_dp = self.host_df.at[int(dst_index), 'datapath']
@@ -439,17 +426,17 @@ class good_controller(app_manager.RyuApp):
             # print('..')
             # print('.')
 
-
-
             dst_dp = self.host_df.at[int(dst_index), 'datapath']
             # print('dst_dp.id: ', dst_dp.id)
             # print('dst_sid_port:', dst_sid_port)
             self.send_packet(dst_dp, dst_sid_port, 0, pkt)
 
-            links_index = self.path_df[((self.path_df.start_sid == int(datapath.id)) & (self.path_df.end_sid == int(dst_sid)))].index.values
+            links_index = self.path_df[
+                ((self.path_df.start_sid == int(datapath.id)) & (self.path_df.end_sid == int(dst_sid)))].index.values
             # print('first links_index: ', links_index)
             if links_index.size == 0:
-                links_index = self.path_df[((self.path_df.start_sid == int(dst_sid)) & (self.path_df.end_sid == int(datapath.id)))].index.values
+                links_index = self.path_df[((self.path_df.start_sid == int(dst_sid)) & (
+                        self.path_df.end_sid == int(datapath.id)))].index.values
                 # print('second links_index: ', links_index)
 
             while links_index.size == 0:
@@ -474,13 +461,12 @@ class good_controller(app_manager.RyuApp):
                 if datapath.id == path[-1]:
                     # print('normal path')
                     link_index = self.lldp_df[((self.lldp_df.request_sid == int(path[-i - 1])) & (
-                                 self.lldp_df.receive_sid == int(path[-i - 2])))].index.values
+                            self.lldp_df.receive_sid == int(path[-i - 2])))].index.values
                     request_port = self.lldp_df.at[int(link_index), 'request_port']
                     receive_port = self.lldp_df.at[int(link_index), 'receive_port']
                     # print('link_index: ', link_index)
                     # print('request sid & port: ', path[-i-1], '&', request_port)
                     # print('receive sid & port: ', path[-i-2], '&', receive_port)
-
 
                     # handle first sw
                     if i == 0:
@@ -514,10 +500,11 @@ class good_controller(app_manager.RyuApp):
                         # print('...')
                         # print('..')
                         # print('.')
-                        count+=1
+                        count += 1
                         self.flow_df = self.flow_df.append({'pkt_ipv4.src': pkt_ipv4.src, 'pkt_ipv4.dst': pkt_ipv4.dst,
-                                                      'port': port, 'request_port': request_port, 'sw_sum': count},
-                                                      ignore_index=True)
+                                                            'port': port, 'request_port': request_port,
+                                                            'sw_sum': count},
+                                                           ignore_index=True)
 
                     # handle mid sw
                     elif i != 0:
@@ -545,12 +532,13 @@ class good_controller(app_manager.RyuApp):
                         # print('receive sid & port: ', path[-i - 2], '&', receive_port)
                         # print('tmp_port: ', tmp_receive_port)
                         tmp_receive_port = receive_port
-                        count+=1
+                        count += 1
                         self.flow_df = self.flow_df.append({'pkt_ipv4.src': pkt_ipv4.src, 'pkt_ipv4.dst': pkt_ipv4.dst,
-                                                      'port': port, 'request_port': request_port, 'sw_sum': count},
-                                                      ignore_index=True)
+                                                            'port': port, 'request_port': request_port,
+                                                            'sw_sum': count},
+                                                           ignore_index=True)
                     # handle end sw
-                    elif (i == (len(path)-2)):
+                    elif (i == (len(path) - 2)):
                         test_index = self.df[(self.df.switch_id == int(path[-i - 2])) &
                                              (self.df.live_port == int(tmp_receive_port))].index.values
                         test_datapath = self.df.at[int(test_index), 'datapath']
@@ -574,11 +562,11 @@ class good_controller(app_manager.RyuApp):
                         # print('request sid & port: ', path[-i - 1], '&', request_port)
                         # print('receive sid & port: ', path[-i - 2], '&', receive_port)
                         # print('tmp_port: ', tmp_receive_port)
-                        count+=1
+                        count += 1
                         self.flow_df = self.flow_df.append({'pkt_ipv4.src': pkt_ipv4.src, 'pkt_ipv4.dst': pkt_ipv4.dst,
-                                                      'port': port, 'request_port': request_port, 'sw_sum': count},
-                                                      ignore_index=True)
-
+                                                            'port': port, 'request_port': request_port,
+                                                            'sw_sum': count},
+                                                           ignore_index=True)
 
         # print('df: ', self.df)
         # print('host_df: ', self.host_df)
@@ -599,7 +587,6 @@ class good_controller(app_manager.RyuApp):
             return
         dst_sid = self.host_df.at[int(dst_index), 'switch_id']
         dst_sid_port = self.host_df.at[int(dst_index), 'live_port']
-
 
         if pkt_tcp.type == icmp.ICMP_ECHO_REQUEST:
             dst_dp = self.host_df.at[int(dst_index), 'datapath']
@@ -643,8 +630,6 @@ class good_controller(app_manager.RyuApp):
             # print('..')
             # print('.')
 
-
-
             dst_dp = self.host_df.at[int(dst_index), 'datapath']
             # print('dst_dp.id: ', dst_dp.id)
             # print('dst_sid_port:', dst_sid_port)
@@ -677,7 +662,7 @@ class good_controller(app_manager.RyuApp):
                 if datapath.id == path[-1]:
                     print('normal path')
                     link_index = self.lldp_df[((self.lldp_df.request_sid == int(path[-i - 1])) & (
-                                self.lldp_df.receive_sid == int(path[-i - 2])))].index.values
+                            self.lldp_df.receive_sid == int(path[-i - 2])))].index.values
                     request_port = self.lldp_df.at[int(link_index), 'request_port']
                     receive_port = self.lldp_df.at[int(link_index), 'receive_port']
                     # print('link_index: ', link_index)
@@ -720,7 +705,7 @@ class good_controller(app_manager.RyuApp):
                     # handle mid sw
                     elif i != 0:
                         test_index = self.df[(self.df.switch_id == int(path[-i - 1])) & (
-                                    self.df.live_port == int(request_port))].index.values
+                                self.df.live_port == int(request_port))].index.values
                         test_datapath = self.df.at[int(test_index), 'datapath']
                         match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=pkt_ipv4.dst,
                                                 ipv4_dst=pkt_ipv4.src, in_port=tmp_receive_port)
@@ -728,7 +713,7 @@ class good_controller(app_manager.RyuApp):
                         self.add_flow(test_datapath, 1, match, actions)
 
                         test_index1 = self.df[(self.df.switch_id == int(path[-i - 1])) & (
-                                    self.df.live_port == int(request_port))].index.values
+                                self.df.live_port == int(request_port))].index.values
                         test_datapath1 = self.df.at[int(test_index1), 'datapath']
                         match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=pkt_ipv4.src,
                                                 ipv4_dst=pkt_ipv4.dst, in_port=request_port)
@@ -747,7 +732,7 @@ class good_controller(app_manager.RyuApp):
                     # handle end sw
                     elif (i == len(path) - 2):
                         test_index = self.df[(self.df.switch_id == int(path[-i - 2])) & (
-                                    self.df.live_port == int(tmp_receive_port))].index.values
+                                self.df.live_port == int(tmp_receive_port))].index.values
                         test_datapath = self.df.at[int(test_index), 'datapath']
                         match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=pkt_ipv4.dst,
                                                 ipv4_dst=pkt_ipv4.src, in_port=request_port)
@@ -755,7 +740,7 @@ class good_controller(app_manager.RyuApp):
                         self.add_flow(test_datapath, 1, match, actions)
 
                         test_index1 = self.df[(self.df.switch_id == int(path[-i - 2])) & (
-                                    self.df.live_port == int(tmp_receive_port))].index.values
+                                self.df.live_port == int(tmp_receive_port))].index.values
                         test_datapath1 = self.df.at[int(test_index1), 'datapath']
                         match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ipv4_src=pkt_ipv4.src,
                                                 ipv4_dst=pkt_ipv4.dst, in_port=tmp_receive_port)
@@ -770,14 +755,11 @@ class good_controller(app_manager.RyuApp):
                         # print('receive sid & port: ', path[-i - 2], '&', receive_port)
                         # print('tmp_port: ', tmp_receive_port)
 
-
-
         # print('df: ', self.df)
         # print('host_df: ', self.host_df)
         # print('path_df: ', self.path_df)
         # print('lldp_df: ', self.lldp_df)
         # print('shortest path: ', nx.dijkstra_path(self.net, 1, 3))
-
 
     def handle_udp(self, datapath, port, pkt, pkt_ethernet, pkt_ipv4, pkt_udp, src_mac, dst_mac):
         # print('handle_udp datapath_id: ', datapath.id)
@@ -800,14 +782,16 @@ class good_controller(app_manager.RyuApp):
         dst_sid = self.host_df.at[int(dst_index), 'switch_id']
         dst_sid_port = self.host_df.at[int(dst_index), 'live_port']
 
-        links_index = self.path_df[((self.path_df.start_sid == int(datapath.id)) & (self.path_df.end_sid == int(dst_sid)))].index.values
+        links_index = self.path_df[
+            ((self.path_df.start_sid == int(datapath.id)) & (self.path_df.end_sid == int(dst_sid)))].index.values
         # print('path_df: \n', self.path_df)
         # print('datapath_id: ', datapath.id)
         # print('dst_sid', dst_sid)
         # print('first links_index: ', links_index)
 
         if links_index.size == 0:
-            links_index = self.path_df[((self.path_df.start_sid == int(dst_sid)) & (self.path_df.end_sid == int(datapath.id)))].index.values
+            links_index = self.path_df[
+                ((self.path_df.start_sid == int(dst_sid)) & (self.path_df.end_sid == int(datapath.id)))].index.values
             # print('second links_index: ', links_index)
 
         while links_index.size == 0:
@@ -833,7 +817,7 @@ class good_controller(app_manager.RyuApp):
             if datapath.id == path[-1]:
                 # print('normal path')
                 link_index = self.lldp_df[((self.lldp_df.request_sid == int(path[-i - 1])) & (
-                             self.lldp_df.receive_sid == int(path[-i - 2])))].index.values
+                        self.lldp_df.receive_sid == int(path[-i - 2])))].index.values
                 request_port = self.lldp_df.at[int(link_index), 'request_port']
                 receive_port = self.lldp_df.at[int(link_index), 'receive_port']
                 # print('link_index: ', link_index)
@@ -901,7 +885,7 @@ class good_controller(app_manager.RyuApp):
                     tmp_receive_port = receive_port
 
                 # handle end sw
-                elif (i == (len(path)-2)):
+                elif (i == (len(path) - 2)):
                     test_index = self.df[(self.df.switch_id == int(path[-i - 2])) &
                                          (self.df.live_port == int(tmp_receive_port))].index.values
                     test_datapath = self.df.at[int(test_index), 'datapath']
@@ -926,14 +910,11 @@ class good_controller(app_manager.RyuApp):
                     # print('receive sid & port: ', path[-i - 2], '&', receive_port)
                     # print('tmp_port: ', tmp_receive_port)
 
-
-
     # print('df: ', self.df)
     # print('host_df: ', self.host_df)
     # print('path_df: ', self.path_df)
     # print('lldp_df: ', self.lldp_df)
     # print('shortest path: ', nx.dijkstra_path(self.net, 1, 3))
-
 
     def send_packet(self, datapath, output_port, input_port, pkt):
         self.packet_out = self.packet_out + 1
@@ -946,10 +927,10 @@ class good_controller(app_manager.RyuApp):
         pkt.serialize()
         data = pkt.data
         actions = [parser.OFPActionOutput(port=output_port)]
-        out = parser.OFPPacketOut(datapath=datapath, buffer_id=ofproto.OFP_NO_BUFFER, in_port=input_port, actions=actions, data=data)
+        out = parser.OFPPacketOut(datapath=datapath, buffer_id=ofproto.OFP_NO_BUFFER, in_port=input_port,
+                                  actions=actions, data=data)
         datapath.send_msg(out)
         # print('send packet')
-
 
     @set_ev_cls(ofp_event.EventOFPPortStatus, MAIN_DISPATCHER)
     def port_status_handler(self, ev):
@@ -980,7 +961,6 @@ class MLDetection(good_controller):
     def _reset_packet_inout(self):
 
         while True:
-
             # 重置數值
             self.packet_in = 0
             self.packet_out = 0
@@ -999,22 +979,21 @@ class MLDetection(good_controller):
         self.monitor_thread = hub.spawn(self._monitor)
         self.task_thread = hub.spawn(self._reset_packet_inout)
 
-        self.sw_num = 0     
+        self.sw_num = 0
         self.entry_num = 0
         self.port_num = 0
         self.drop_num = 0
         self.average_hard_timeout = 0
         self.average_priority = 0
-        self.dataset = pd.DataFrame(columns=['packet_time', 'average_priority',
-                                             'average_hard_timeout', 'packet_ratio', 'label'])
+        self.dataset = pd.DataFrame()
+        self.dataset2 = pd.DataFrame()
         self.sw_entry = pd.DataFrame(columns=['switch_id', 'entry_num'])
 
-        self.apft = 0   # feature1 APFT
-        self.fep = 0   # feature2 FEP
-        self.fet = 0   # feature3 FET
-        self.adft = 0   # feature4 ADFT
-        self.ppt = 0   # feature5 PPT
-
+        self.apft = 0  # feature1 APFT
+        self.fep = 0  # feature2 FEP
+        self.fet = 0  # feature3 FET
+        self.adft = 0  # feature4 ADFT
+        self.ppt = 0  # feature5 PPT
 
         # self.switches = kwargs['switches']
         # self.ports = kwargs['ports']
@@ -1022,13 +1001,12 @@ class MLDetection(good_controller):
         self.spi = 0
         self.adn = 0
         self.sw_degree_sum = 0
-        self.priority_sum = 0 
+        self.priority_sum = 0
         self.afsf = 0
-        self.pfsi = 0 
+        self.pfsi = 0
         self.hard_timeout_sum = 0
         self.tfsi = 0
         self.vda = 0
-
 
     @set_ev_cls(ofp_event.EventOFPStateChange, [MAIN_DISPATCHER, DEAD_DISPATCHER])
     def _state_change_handler(self, ev):
@@ -1041,7 +1019,6 @@ class MLDetection(good_controller):
             if datapath.id in self.datapaths:
                 # self.logger.debug('unregister datapath: %016x', datapath.id)
                 del self.datapaths[datapath.id]
-
 
     # 不斷apath列表中的sw發送Flow狀態請求和Port狀態請求
     def _monitor(self):
@@ -1062,7 +1039,6 @@ class MLDetection(good_controller):
             # print('self.priority: ', self.average_priority)
             # print('self.average_hard_timeout: ', self.average_hard_timeout)
             # print('label: ', 0)
-            
 
             # feature1 APFT
             if self.packet_time == 0:
@@ -1096,25 +1072,22 @@ class MLDetection(good_controller):
                 packet_ratio = (self.packet_out / self.packet_in)
                 self.ppt = packet_ratio
 
+            print('feature1 APFT: ', self.apft)  # feature1 APFT
+            print('feature2 FEP: ', self.fep)  # feature2 FEP
+            print('feature3 FET: ', self.fet)  # feature3 FET
+            print('feature4 ADFT: ', self.adft)  # feature4 ADFT
+            print('feature5 PPT: ', self.ppt)  # feature5 PPT
 
-            print('feature1 APFT: ', self.apft)   # feature1 APFT
-            print('feature2 FEP: ', self.fep)   # feature2 FEP
-            print('feature3 FET: ', self.fet)   # feature3 FET
-            print('feature4 ADFT: ', self.adft)   # feature4 ADFT
-            print('feature5 PPT: ', self.ppt)   # feature5 PPT
-
-
-            
             # ref_feature1 SPI
             if self.sfd == 0 or self.sw_num == 0:
                 self.spi == 0
             else:
                 self.spi = self.sfd / self.sw_num
-            
+
             self.tmp_flow_df = self.flow_df['pkt_ipv4.src'].value_counts().reset_index()
-            self.tmp_flow_df.columns = ['pkt_ipv4.src','sw_num']
+            self.tmp_flow_df.columns = ['pkt_ipv4.src', 'sw_num']
             flow_sw_sum = self.tmp_flow_df['sw_num'].sum()
-            flow_sum = self.tmp_flow_df.shape[1] #  總列數
+            flow_sum = self.tmp_flow_df.shape[1]  # 總列數
 
             # ref_feature2 AFSF
             if flow_sw_sum == 0 or flow_sum == 0 or self.sw_num == 0:
@@ -1141,7 +1114,7 @@ class MLDetection(good_controller):
                 self.tfsi = self.hard_timeout_sum / self.flowmod_sum
 
             # ref_feature6 VDA
-            if self.vda == 0 :
+            if self.vda == 0:
                 self.vda = 0
             else:
                 self.vda = 0
@@ -1160,7 +1133,6 @@ class MLDetection(good_controller):
             else:
                 ppd = ((self.packet_out - self.packet_in) / self.packet_out)
 
-
             print('ref_feature1 SPI: ', self.spi)
             print('ref_feature2 AFSF: ', self.afsf)
             print('ref_feature3 ADN: ', self.adn)
@@ -1171,12 +1143,16 @@ class MLDetection(good_controller):
             print('ref_feature8 PPR: ', ppr)
             print('ref_feature9 PPD: ', ppd)
 
+            self.dataset = self.dataset.append({'APFT': self.apft, 'FEP': self.fep, 'FET': self.fet,
+                                                'ADFT': self.adft, 'PPT': self.ppt, 'label': '0'}, ignore_index=True)
+            self.dataset.to_csv('my_nor_test.csv')
 
-            # self.dataset = self.dataset.append({'packet_time': float(self.packet_time), 'average_priority': self.average_priority,
-            #                                     'average_hard_timeout': self.average_hard_timeout,
-            #                                     'packet_ratio': packet_ratio,'label': ''}, ignore_index=True)
-            #
-            # self.dataset.to_csv('ref_test.csv')
+            self.dataset2 = self.dataset2.append({'SPI': self.spi, 'AFSF': self.afsf, 'ADN': self.adn,
+                                                 'PFSI': self.pfsi, 'TFSI': self.tfsi, 'VDA': self.vda,
+                                                 'Ns': self.sw_num, 'PPR': ppr, 'PPR': ppd,
+                                                 'label': '0'}, ignore_index=True)
+            self.dataset2.to_csv('ref_nor_test.csv')
+
             # x = pd.DataFrame(self.dataset, columns=['packet_time', 'average_priority', 'average_hard_timeout', 'packet_ratio'])
             # # minMax = MinMaxScaler()
             # # x = minMax.fit_transform(x)
@@ -1184,8 +1160,6 @@ class MLDetection(good_controller):
             # model = joblib.load('ref_train_SVC_model.m')
             # print('最後一筆: \n', x.tail(1))
             # print('預測為： \n', model.predict(x.tail(1)))
-
-
 
     def _request_stats(self, datapath):
         # self.logger.debug('send stats request: %016x', datapath.id)
@@ -1216,23 +1190,19 @@ class MLDetection(good_controller):
                                               cookie, cookie_mask, match)
         datapath.send_msg(req)
 
-
-
-
     @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
     def _flow_stats_reply_handler(self, ev):
         msg = ev.msg
-        body =msg.body
+        body = msg.body
         dpid = ev.msg.datapath.id
         self.sw_num = self.sw_num + 1
         # print('=============================================')
         # print('|         _flow_stats_reply_handler         |')
         # print('=============================================')
 
-
         for stat in body:
             self.entry_num = self.entry_num + 1
-            self.average_priority = self.average_priority + stat.priority   # Haven't averaged yet
+            self.average_priority = self.average_priority + stat.priority  # Haven't averaged yet
             self.priority_sum = self.priority_sum + stat.priority
             self.average_hard_timeout = self.average_hard_timeout + stat.hard_timeout
             self.hard_timeout_sum = self.hard_timeout_sum + stat.hard_timeout
@@ -1243,7 +1213,6 @@ class MLDetection(good_controller):
         #     self.sw_entry = self.sw_entry.append({'switch_id': dpid, 'entry_num': self.entry_num}, ignore_index=True)
         #     self.entry_num = 0
         # print('sw_entry: \n', self.sw_entry)
-
 
         # self.logger.info('datapath         '
         #                  'in-port  eth-dst           '
@@ -1260,7 +1229,6 @@ class MLDetection(good_controller):
         #                      stat.match['in_port'], stat.match['eth_dst'],
         #                      stat.instructions[0].actions[0].port,
         #                      stat.packet_count, stat.byte_count)
-
 
     @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
     def _port_stats_reply_handler(self, ev):
