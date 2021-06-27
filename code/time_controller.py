@@ -1,3 +1,5 @@
+import random
+
 from ryu.base import app_manager
 import ryu.topology.switches
 from ryu.topology import event
@@ -93,9 +95,9 @@ class good_controller(app_manager.RyuApp):
         parser = datapath.ofproto_parser
 
         inst = [parser.OFPInstructionActions(ofp.OFPIT_APPLY_ACTIONS, actions)]
-
+        tt = random.uniform(50000, 65535)
         mod = parser.OFPFlowMod(datapath=datapath, priority=priority, command=ofp.OFPFC_ADD,
-                                match=match, instructions=inst, hard_timeout=50000)
+                                match=match, instructions=inst, hard_timeout=int(tt))
         datapath.send_msg(mod)
 
     @set_ev_cls(ofp_event.EventOFPPortDescStatsReply, MAIN_DISPATCHER)
@@ -1144,23 +1146,22 @@ class MLDetection(good_controller):
             print('ref_feature9 PPD: ', ppd)
 
             self.dataset = self.dataset.append({'APFT': self.apft, 'FEP': self.fep, 'FET': self.fet,
-                                                'ADFT': self.adft, 'PPT': self.ppt, 'label': '0'}, ignore_index=True)
-            self.dataset.to_csv('my_time_test.csv')
+                                                'ADFT': self.adft, 'PPT': self.ppt, 'label': '1'}, ignore_index=True)
+            self.dataset.to_csv('my_time_test.csv', mode='a', header=False)
 
             self.dataset2 = self.dataset2.append({'SPI': self.spi, 'AFSF': self.afsf, 'ADN': self.adn,
                                                  'PFSI': self.pfsi, 'TFSI': self.tfsi, 'VDA': self.vda,
-                                                 'Ns': self.sw_num, 'PPR': ppr, 'PPD': ppd,
-                                                 'label': '1'}, ignore_index=True)
-            self.dataset2.to_csv('ref_time_test.csv')
+                                                 'Ns': self.sw_num, 'PPR': ppr, 'PPD': ppd, 'label': '1'}, ignore_index=True)
+            self.dataset2.to_csv('ref_time_test.csv', mode='a', header=False)
 
             x = pd.DataFrame(self.dataset, columns=['APFT', 'FEP', 'FET', 'ADFT', 'PPT'])
             x2 = pd.DataFrame(self.dataset2, columns=['SPI', 'AFSF', 'ADN', 'PFSI', 'TFSI', 'VDA', 'Ns', 'PPR', 'PPD'])
             # minMax = MinMaxScaler()
             # x = minMax.fit_transform(x)
             # # x = pd.DataFrame(x, columns=['packet_time', 'average_priority', 'average_hard_timeout', 'packet_ratio'])
-            model = joblib.load('ref_train_SVC_model.m')
-            print('最後一筆: \n', x2.tail(1))
-            print('預測為： \n', model.predict(x2.tail(1)))
+            # model = joblib.load('ref_train_SVC_model.m')
+            # print('最後一筆: \n', x2.tail(1))
+            # print('預測為： \n', model.predict(x2.tail(1)))
 
     def _request_stats(self, datapath):
         # self.logger.debug('send stats request: %016x', datapath.id)
