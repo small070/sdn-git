@@ -921,8 +921,10 @@ class good_controller(app_manager.RyuApp):
 
     def send_packet(self, datapath, output_port, input_port, pkt):
         self.packet_out = self.packet_out + 1
-        self.packet_out_time = datetime.datetime.now()
+        sleep = random.uniform(5, 10)
+        self.packet_out_time = datetime.datetime.now() + datetime.timedelta(seconds=int(sleep))
         self.packet_time = (self.packet_out_time - self.packet_in_time).total_seconds()
+
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         if input_port == 0:
@@ -1147,14 +1149,14 @@ class MLDetection(good_controller):
             print('ref_feature9 PPD: ', ppd)
 
             self.dataset = self.dataset.append({'APFT': float(self.apft), 'FEP': self.fep, 'FET': self.fet,
-                                                'ADFT': self.adft, 'PPT': self.ppt, 'label': '0'}, ignore_index=True)
-            self.dataset.to_csv('my_nor_test.csv', mode='a', header=False)
+                                                'ADFT': self.adft, 'PPT': self.ppt, 'label': '1'}, ignore_index=True)
+            self.dataset.to_csv('my_sleep_test.csv', mode='a', header=False)
 
             self.dataset2 = self.dataset2.append({'SPI': self.spi, 'AFSF': self.afsf, 'ADN': self.adn,
                                                  'PFSI': self.pfsi, 'TFSI': self.tfsi, 'VDA': self.vda,
                                                  'Ns': self.sw_num, 'PPR': ppr, 'PPD': ppd,
-                                                 'label': '0'}, ignore_index=True)
-            self.dataset2.to_csv('ref_nor_test.csv', mode='a', header=False)
+                                                 'label': '1'}, ignore_index=True)
+            self.dataset2.to_csv('ref_sleep_test.csv', mode='a', header=False)
 
             x = pd.DataFrame(self.dataset, columns=['APFT', 'FEP', 'FET', 'ADFT', 'PPT'])
             x2 = pd.DataFrame(self.dataset2, columns=['SPI', 'AFSF', 'ADN', 'PFSI', 'TFSI', 'VDA', 'Ns', 'PPR', 'PPD'])

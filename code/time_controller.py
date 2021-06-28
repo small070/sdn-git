@@ -1145,7 +1145,7 @@ class MLDetection(good_controller):
             print('ref_feature8 PPR: ', ppr)
             print('ref_feature9 PPD: ', ppd)
 
-            self.dataset = self.dataset.append({'APFT': self.apft, 'FEP': self.fep, 'FET': self.fet,
+            self.dataset = self.dataset.append({'APFT': float(self.apft), 'FEP': self.fep, 'FET': self.fet,
                                                 'ADFT': self.adft, 'PPT': self.ppt, 'label': '1'}, ignore_index=True)
             self.dataset.to_csv('my_time_test.csv', mode='a', header=False)
 

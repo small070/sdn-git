@@ -26,7 +26,7 @@ from operator import attrgetter
 from ryu.lib import hub
 import joblib
 from sklearn.preprocessing import MinMaxScaler
-
+import random
 #   顯示所有columns
 pd.set_option('display.max_columns', None)
 #   顯示所有rows
@@ -93,8 +93,8 @@ class good_controller(app_manager.RyuApp):
         parser = datapath.ofproto_parser
 
         inst = [parser.OFPInstructionActions(ofp.OFPIT_APPLY_ACTIONS, actions)]
-
-        mod = parser.OFPFlowMod(datapath=datapath, priority=50000, command=ofp.OFPFC_ADD,
+        pr = random.uniform(50000, 65535)
+        mod = parser.OFPFlowMod(datapath=datapath, priority=int(pr), command=ofp.OFPFC_ADD,
                                 match=match, instructions=inst, hard_timeout=50)
         datapath.send_msg(mod)
 
@@ -1143,15 +1143,15 @@ class MLDetection(good_controller):
             print('ref_feature8 PPR: ', ppr)
             print('ref_feature9 PPD: ', ppd)
 
-            self.dataset = self.dataset.append({'APFT': self.apft, 'FEP': self.fep, 'FET': self.fet,
-                                                'ADFT': self.adft, 'PPT': self.ppt, 'label': '0'}, ignore_index=True)
-            self.dataset.to_csv('my_pri_test.csv')
+            self.dataset = self.dataset.append({'APFT': float(self.apft), 'FEP': self.fep, 'FET': self.fet,
+                                                'ADFT': self.adft, 'PPT': self.ppt, 'label': '1'}, ignore_index=True)
+            self.dataset.to_csv('my_pri_test.csv', mode='a', header=False)
 
             self.dataset2 = self.dataset2.append({'SPI': self.spi, 'AFSF': self.afsf, 'ADN': self.adn,
                                                  'PFSI': self.pfsi, 'TFSI': self.tfsi, 'VDA': self.vda,
                                                  'Ns': self.sw_num, 'PPR': ppr, 'PPD': ppd,
                                                  'label': '1'}, ignore_index=True)
-            self.dataset2.to_csv('ref_pri_test.csv')
+            self.dataset2.to_csv('ref_pri_test.csv', mode='a', header=False)
 
             # x = pd.DataFrame(self.dataset, columns=['packet_time', 'average_priority', 'average_hard_timeout', 'packet_ratio'])
             # # minMax = MinMaxScaler()

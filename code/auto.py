@@ -7,11 +7,11 @@ currentMouseX, currentMouseY = pyautogui.position()  # 鼠标当前位置
 print(currentMouseX, currentMouseY)
 
 
-for i in range(0, 920, 1):
+for i in range(0, 900, 1):
     # 2535 305
     pyautogui.moveTo(2535, 305, duration=0.25)
     pyautogui.click(2535, 305, 2, 0.25, button='left')
-    pyautogui.typewrite('sudo ryu-manager time_controller.py', interval=0.03) # 每次输入间隔0.25秒，输入Hello world!
+    pyautogui.typewrite('sudo ryu-manager nor_controller.py', interval=0.03) # 每次输入间隔0.25秒，输入Hello world!
     pyautogui.press('enter')  # 按下并松开（轻敲）回车键
 
     time.sleep(2)
