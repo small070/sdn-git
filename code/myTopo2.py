@@ -112,12 +112,17 @@ def creater():
     test.create_host()
     test.create_switch()
     test.create_link()
+    controller_list = []
     net = Mininet(topo=test, link=TCLink, controller=None)
     net.addController('controller1', controller=RemoteController, ip='127.0.0.1', port=6653)
+    net.addController('controller2', controller=RemoteController, ip='127.0.0.2', port=6633)
+    #
+    # controller_list.append(net.addController('controller1', controller=RemoteController, ip='127.0.0.1', port=6653))
+    # controller_list.append(net.addController('controller2', controller=RemoteController, ip='127.0.0.2', port=6633))
 
     net.start()
     CLI(net)
-    net.pingAll(10)
+    # net.pingAll(10)
     net.stop()
 
 

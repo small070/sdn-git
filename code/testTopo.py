@@ -33,6 +33,7 @@ class MyTopo(Topo):
         # num_sw = number of switch
 
         # Add switch
+
         for i in range(0, self.num_sw, 1):
             self.switch.append(self.addSwitch('s'+str(i+1)))
         print('Adding Switches...')
@@ -91,7 +92,10 @@ def creater():
     test.create_switch()
     test.create_link()
     net = Mininet(topo = test, link = TCLink, controller = None)
-    net.addController('controller1', controller = RemoteController, ip = '127.0.0.1', port = 6653)
+    c1 = net.addController('controller1', controller = RemoteController, ip = '127.0.0.1', port = 6653)
+    c2 = net.addController('controller2', controller = RemoteController, ip = '127.0.0.2', port = 6633)
+
+    net.build()
     net.start()
     CLI(net)
 
